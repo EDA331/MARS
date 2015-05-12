@@ -1,8 +1,8 @@
 ### Text segment
 		.text
 start:
-		la	$a0, matrix_4x4		# a0 = A (base address of matrix)
-		li	$a1, 4    		    # a1 = N (number of elements per row)
+		la	$a0, matrix_24x24		# a0 = A (base address of matrix)
+		li	$a1, 24    		    # a1 = N (number of elements per row)
 									# <debug>
 		jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
@@ -31,69 +31,71 @@ eliminate:
 		sw	$ra, 0($sp)			# done saving registers
 		addiu	$s2, $0, 0			# k = 0
 pivots:			
-		sll	$t0, $a1, 2			# t0 = N*4
-		multu	$t0, $s2			# N*4*k
+		sll	$t1, $s2, 2			# t1 = k*4
+		multu	$a1, $t1			# N*4*k
 		mflo	$t0				# t0 = N*4*k
-		addu	$t0, $t0, $a0			# t0 = N*4*k + &A = &A[k][0]
+		nop					# To avoid RAW
+		addu	$t0, $t0, $a0			# t0 = &A[k][0]
+		nop					# To avoid RAW
+		addu	$t1, $t1, $t0			# t1 = &A[k][k]
 		
 		addiu	$s1, $s2, 1			# j = k + 1 
 pivot_row:
 		beq 	$s1, $a1, pivot_row_end		# If j == N, then exit
 		
-		sll   	$t1, $s2, 2 			# t1 = k*4 
-		addu	$t1, $t1, $t0			# t1 = &A[k][k]
-		sll	$t2, $s1, 2			# t2 = j*4
+		nop					# To avoid branch hazard
+		sll   	$t2, $s1, 2 			# t2 = j*4
+		nop					# To avoid RAW
 		addu	$t2, $t2, $t0			# t2 = &A[k][j]
-		l.s	$f0, 0($t1)			# f0 = A[k][k]
-		l.s	$f1, 0($t2)			# f1 = A[k][j]
-		
-		addiu	$s1, $s1, 1			# j++ (to avoid hazard)
-		
+		lwc1	$f1, 0($t1)			# f1 = A[k][k]
+		lwc1	$f0, 0($t2)			# f0 = A[k][j]
+		addiu	$s1, $s1, 1			# j++ (to avoid RAW)
 		div.s	$f0, $f0, $f1			# f0 = A[k][j] / A[k][k]
 		
 		b	pivot_row			# Branch to next iteration
-		s.s	$f0, 0($t1) 			# A[k][j] = f0
+		swc1	$f0, 0($t2) 			# A[k][j] = f0
+		
 pivot_row_end:	
-		l.s 	$f0, one			# t0 = 1.0
-		addiu 	$s0, $s2, 1			# i = k + 1 (to avoid hazard)
-		s.s	$f0, 0($t2)			# A[k][k] = 1.0
+		lwc1 	$f0, one			# t0 = 1.0
+		addiu 	$s0, $s2, 1			# i = k + 1 (to avoid RAW)
+		swc1	$f0, 0($t1)			# A[k][k] = 1.0
 pivot_mat_row:
 		beq 	$s0, $a1, pivot_mat_row_end	# If i == N, then exit
 		
 		sll	$t1, $a1, 2			# t1 = N*4
 		multu	$t1, $s0			# N*4*i
 		mflo	$t1				# t1 = N*4*i
+		addiu	$s1, $s2, 1			# j = k + 1 (to avoid RAW)
 		addu	$t1, $t1, $a0			# t1 = N*4*i + &A = &A[i][0]
-		
-		addiu	$s1, $s2, 1			# j = k + 1
 pivot_mat_col:
 		beq 	$s1, $a1, pivot_mat_col_end	# If j == N, then exit
 		
 		sll	$t5, $s1, 2			# t5 = j*4
+		sll	$t6, $s2, 2			# t5 = k*4 
 		addu	$t2, $t0, $t5			# t2 = &A[k][j]
 		addu	$t3, $t1, $t5			# t3 = &A[i][j]
-		sll	$t5, $s2, 2			# t5 = k*4 
-		addu  	$t4, $t1, $t5			# t4 = &A[i][k]
-		l.s	$f0, 0($t2)			# f0 = A[k][j]
-		l.s	$f1, 0($t3)			# f1 = A[i][j]
-		l.s	$f2, 0($t4)			# f2 = A[i][k]
+		addu  	$t4, $t1, $t6			# t4 = &A[i][k]
+		lwc1	$f0, 0($t2)			# f0 = A[k][j]
+		lwc1	$f1, 0($t3)			# f1 = A[i][j]
+		lwc1	$f2, 0($t4)			# f2 = A[i][k]
 		
-		addiu	$s1, $s1, 1			# j++ (to avoid hazard)
+		addiu	$s1, $s1, 1			# j++ (to avoid RAW)
 		
 		mul.s	$f0, $f2, $f0			# f0 = A[i][k]*A[k][j]
+		nop					# To avoid RAW
 		sub.s	$f0, $f1, $f0			# f0 = A[i][j] - A[i][k]*A[k][j]
 		
 		b	pivot_mat_col			# Branch to next iteration
-		l.s	$f0, 0($t3)			# A[i][j] = f0
+		swc1	$f0, 0($t3)			# A[i][j] = f0
 pivot_mat_col_end:
-		l.s	$f0, zero
-		addiu	$s0, $s0, 1			# j++ (to avoid hazard)
-		s.s	$f0, 0($t4)			# A[i][k] = 0.0
-
+		lwc1	$f0, zero			# f0 = 0.0
+		addiu	$s0, $s0, 1			# j++ (to avoid RAW)
 		b	pivot_mat_row			# Branch to next iteration
+		swc1	$f0, 0($t4)			# A[i][k] = 0.0
 pivot_mat_row_end:
 		addiu	$s2, $s2, 1			# k++
 		bne	$s2, $a1, pivots		# k != N
+		nop
 pivots_end:
 		lw	$ra, 0($sp)			
 		lw 	$s0, 4($sp)

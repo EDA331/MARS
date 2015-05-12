@@ -34,64 +34,52 @@ pivots:
 		sll	$t1, $s2, 2			# t1 = k*4
 		multu	$a1, $t1			# N*4*k
 		mflo	$t0				# t0 = N*4*k
-		nop					# To avoid RAW
 		addu	$t0, $t0, $a0			# t0 = &A[k][0]
-		nop					# To avoid RAW
 		addu	$t1, $t1, $t0			# t1 = &A[k][k]
-		
+		addu 	$t2, $0, $t1			# t2 = &A[k][k] (permanent copy)
+		lwc1	$f0, 0($t1)			# f0 = A[k][k]
 		addiu	$s1, $s2, 1			# j = k + 1 
 pivot_row:
 		beq 	$s1, $a1, pivot_row_end		# If j == N, then exit
-		
-		nop					# To avoid branch hazard
-		sll   	$t2, $s1, 2 			# t2 = j*4
-		nop					# To avoid RAW
-		addu	$t2, $t2, $t0			# t2 = &A[k][j]
-		lwc1	$f1, 0($t1)			# f1 = A[k][k]
-		lwc1	$f0, 0($t2)			# f0 = A[k][j]
-		addiu	$s1, $s1, 1			# j++ (to avoid RAW)
-		div.s	$f0, $f0, $f1			# f0 = A[k][j] / A[k][k]
-		
+		lwc1	$f1, 4($t1)			# f1 = A[k][j]
+		div.s	$f2, $f1, $f0			# f1 = A[k][j] / A[k][k]
+		addiu	$s1, $s1, 1			# j++
+		swc1	$f2, 4($t1) 			# A[k][j] = f2
 		b	pivot_row			# Branch to next iteration
-		swc1	$f0, 0($t2) 			# A[k][j] = f0
-		
+		addiu	$t1, $t1, 4			# t1 = t1 + 4
 pivot_row_end:	
-		lwc1 	$f0, one			# t0 = 1.0
-		addiu 	$s0, $s2, 1			# i = k + 1 (to avoid RAW)
-		swc1	$f0, 0($t1)			# A[k][k] = 1.0
+		lwc1 	$f0, one			# f0 = 1.0
+		swc1	$f0, 0($t2)			# A[k][k] = 1.0
+		lwc1	$f3, zero			# f3 = 0.0
+		sll	$t6, $a1, 2			# t6 = N*4
+		addiu 	$s0, $s2, 1			# i = k + 1
+		multu	$t6, $s0			# N*4*i
+		mflo	$t1				# t1 = N*4*i
+		sll	$t5, $s2, 2			# t5 = k*4 
+		addu	$t1, $t1, $a0			# t1 = &A[i][0]
+		addu	$t3, $t1, $t5			# t3 = &A[i][k]
+		addu	$t2, $t0, $t5			# t2 = &A[k][k]
 pivot_mat_row:
 		beq 	$s0, $a1, pivot_mat_row_end	# If i == N, then exit
-		
-		sll	$t1, $a1, 2			# t1 = N*4
-		multu	$t1, $s0			# N*4*i
-		mflo	$t1				# t1 = N*4*i
-		addiu	$s1, $s2, 1			# j = k + 1 (to avoid RAW)
-		addu	$t1, $t1, $a0			# t1 = N*4*i + &A = &A[i][0]
+		lwc1	$f0, 0($t1)			# f0 = A[i][k]
+		addu 	$t1, $0, $t3			# t1 = t3
+		addiu	$s1, $s2, 1			# j = k + 1
 pivot_mat_col:
 		beq 	$s1, $a1, pivot_mat_col_end	# If j == N, then exit
-		
-		sll	$t5, $s1, 2			# t5 = j*4
-		sll	$t6, $s2, 2			# t5 = k*4 
-		addu	$t2, $t0, $t5			# t2 = &A[k][j]
-		addu	$t3, $t1, $t5			# t3 = &A[i][j]
-		addu  	$t4, $t1, $t6			# t4 = &A[i][k]
-		lwc1	$f0, 0($t2)			# f0 = A[k][j]
-		lwc1	$f1, 0($t3)			# f1 = A[i][j]
-		lwc1	$f2, 0($t4)			# f2 = A[i][k]
-		
-		addiu	$s1, $s1, 1			# j++ (to avoid RAW)
-		
-		mul.s	$f0, $f2, $f0			# f0 = A[i][k]*A[k][j]
-		nop					# To avoid RAW
-		sub.s	$f0, $f1, $f0			# f0 = A[i][j] - A[i][k]*A[k][j]
-		
+		lwc1	$f1, 4($t1)			# f1 = A[i][j]
+		lwc1	$f2, 4($t2)			# f2 = A[k][j]
+		mul.s	$f2, $f0, $f2			# f2 = A[i][k]*A[k][j]
+		sub.s	$f2, $f1, $f2			# f2 = A[i][j] - A[i][k]*A[k][j]
+		addiu	$t2, $t2, 4			# t2 = t2 + 4
+		addiu	$s1, $s1, 1			# j++
+		swc1	$f2, 4($t1)			# A[i][j] = f2
 		b	pivot_mat_col			# Branch to next iteration
-		swc1	$f0, 0($t3)			# A[i][j] = f0
+		addiu	$t1, $t1, 4			# t3 = t3 + 4
 pivot_mat_col_end:
-		lwc1	$f0, zero			# f0 = 0.0
-		addiu	$s0, $s0, 1			# j++ (to avoid RAW)
+		swc1	$f3, 0($t3)			# A[i][k] = 0.0
+		addiu	$s0, $s0, 1			# j++
 		b	pivot_mat_row			# Branch to next iteration
-		swc1	$f0, 0($t4)			# A[i][k] = 0.0
+		addu 	$t3, $t3, $t6			# t3 = t3 + N*4
 pivot_mat_row_end:
 		addiu	$s2, $s2, 1			# k++
 		bne	$s2, $a1, pivots		# k != N

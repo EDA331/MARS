@@ -1,8 +1,8 @@
 ### Text segment
 		.text
 start:
-		la		$a0, matrix_4x4		# a0 = A (base address of matrix)
-		li		$a1, 4    		    # a1 = N (number of elements per row)
+		la	$a0, matrix_4x4		# a0 = A (base address of matrix)
+		li	$a1, 4    		    # a1 = N (number of elements per row)
 									# <debug>
 		jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
@@ -24,41 +24,86 @@ exit:
 
 eliminate:
 		# If necessary, create stack frame, and save return address from ra
-		addiu	$sp, $sp, -20		# allocate stack frame
-		sw	$s3, 16($sp)		# For addresses to matrix elements, "elmt"
-		sw	$s2, 12($sp)		# int k
-		sw	$s1, 8($sp)		# int j
-		sw	$s0, 4($sp)		# int i 	
-		sw	$ra, 0($sp)		# done saving registers
-		addu	$s2, $0, $a1
-pivots:		
-		lw	$a2, $s2		# a2 = k
-		lw	$a3, $s2		# a3 = k
-		jal	getelem			# Gets element A[k][k]
-		addiu	$s1, $s2, 1		# j = k + 1 
-pivot_row:
-		sll	$s3, $s1, 2		# elmt = j*4
-		addu	$s3, $s3, $v0		# elmt = A[k][j]
-		divu	$s3, $v0		# A[k][j] / A[k][k]
-		mflo	$s3		
-
-		bne	$s2, $a1, pivot_row	# j < N
-		addiu	$s1, $s1, 1		# j++, pivot_row-loop end
-
-		bne	$s2, $0, pivots		# k < N
-		addiu	$s2, $s2, 1		# k++, pivots-loop end
-
+		addiu	$sp, $sp, -16			# allocate stack frame
+		sw	$s2, 12($sp)			# int k
+		sw	$s1, 8($sp)			# int j
+		sw	$s0, 4($sp)			# int i 	
+		sw	$ra, 0($sp)			# done saving registers
+		addiu	$s2, $0, 0			# k = 0
+pivots:			
+		sll	$t0, $a1, 2			# t0 = N*4
+		multu	$t0, $s2			# N*4*k
+		mflo	$t0				# t0 = N*4*k
+		addu	$t0, $t0, $a0			# t0 = N*4*k + &A = &A[k][0]
 		
+		addiu	$s1, $s2, 1			# j = k + 1 
+pivot_row:
+		beq 	$s1, $a1, pivot_row_end		# If j == N, then exit
+		
+		sll   	$t1, $s2, 2 			# t1 = k*4 
+		addu	$t1, $t1, $t0			# t1 = &A[k][k]
+		sll	$t2, $s1, 2			# t2 = j*4
+		addu	$t2, $t2, $t0			# t2 = &A[k][j]
+		l.s	$f0, 0($t1)			# f0 = A[k][k]
+		l.s	$f1, 0($t2)			# f1 = A[k][j]
+		
+		addiu	$s1, $s1, 1			# j++ (to avoid hazard)
+		
+		div.s	$f0, $f0, $f1			# f0 = A[k][j] / A[k][k]
+		
+		b	pivot_row			# Branch to next iteration
+		s.s	$f0, 0($t1) 			# A[k][j] = f0
+pivot_row_end:	
+		l.s 	$f0, one			# t0 = 1.0
+		addiu 	$s0, $s2, 1			# i = k + 1 (to avoid hazard)
+		s.s	$f0, 0($t2)			# A[k][k] = 1.0
+pivot_mat_row:
+		beq 	$s0, $a1, pivot_mat_row_end	# If i == N, then exit
+		
+		sll	$t1, $a1, 2			# t1 = N*4
+		multu	$t1, $s0			# N*4*i
+		mflo	$t1				# t1 = N*4*i
+		addu	$t1, $t1, $a0			# t1 = N*4*i + &A = &A[i][0]
+		
+		addiu	$s1, $s2, 1			# j = k + 1
+pivot_mat_col:
+		beq 	$s1, $a1, pivot_mat_col_end	# If j == N, then exit
+		
+		sll	$t5, $s1, 2			# t5 = j*4
+		addu	$t2, $t0, $t5			# t2 = &A[k][j]
+		addu	$t3, $t1, $t5			# t3 = &A[i][j]
+		sll	$t5, $s2, 2			# t5 = k*4 
+		addu  	$t4, $t1, $t5			# t4 = &A[i][k]
+		l.s	$f0, 0($t2)			# f0 = A[k][j]
+		l.s	$f1, 0($t3)			# f1 = A[i][j]
+		l.s	$f2, 0($t4)			# f2 = A[i][k]
+		
+		addiu	$s1, $s1, 1			# j++ (to avoid hazard)
+		
+		mul.s	$f0, $f2, $f0			# f0 = A[i][k]*A[k][j]
+		sub.s	$f0, $f1, $f0			# f0 = A[i][j] - A[i][k]*A[k][j]
+		
+		b	pivot_mat_col			# Branch to next iteration
+		l.s	$f0, 0($t3)			# A[i][j] = f0
+pivot_mat_col_end:
+		l.s	$f0, zero
+		addiu	$s0, $s0, 1			# j++ (to avoid hazard)
+		s.s	$f0, 0($t4)			# A[i][k] = 0.0
+
+		b	pivot_mat_row			# Branch to next iteration
+pivot_mat_row_end:
+		addiu	$s2, $s2, 1			# k++
+		bne	$s2, $a1, pivots		# k != N
+pivots_end:
 		lw	$ra, 0($sp)			
 		lw 	$s0, 4($sp)
 		lw 	$s1, 8($sp)
-		lw 	$s2, 12($sp)		
-		lw	$s3, 16($sp)		# done restoring registers
+		lw 	$s2, 12($sp)			# done restoring registers
 		
-		addiu	$sp, $sp, 20		# remove stack frame
+		addiu	$sp, $sp, 16			# remove stack frame
 
-		jr		$ra		# return from subroutine
-		nop				# this is the delay slot associated with all types of jumps
+		jr		$ra			# return from subroutine
+		nop					# this is the delay slot associated with all types of jumps
 
 ################################################################################
 # getelem - Get address and content of matrix element A[a][b].
@@ -158,6 +203,12 @@ spaces:
 		.asciiz "   "   			# spaces to insert between numbers
 newline:
 		.asciiz "\n"  				# newline
+
+## Floating point numbers ##
+zero:
+		.float 0.0
+one:
+		.float 1.0
 
 ## Input matrix: (4x4) ##
 matrix_4x4:	

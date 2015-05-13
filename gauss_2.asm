@@ -1,14 +1,26 @@
+#### Chalmers Tekniska Högskola
+#### EDA331 - Datorsystemteknik
+#### Dennis Bennhage,	bennhage@student.chalmers.se
+#### Hampus Lidin, 	lidin@student.chalmers.se
+#### 13/5-15
+#
+# I-Cache:	Direct mapped, 128 bytes, 8 blocks (16-byte blocks), LRU replacement policy
+# D-Cache: 	2-way, 256 bytes, 16 blocks (16-byte blocks), LRU replacement policy 
+# CPU:		450 MHz
+# Memory:	30 cycles first time access, 6 cycles succeeding access, 16-byte write buffer
+# Evaluation:	Price 3.37 C$, execution time 313.264 µs, total component cost 1 055.701 µsC$
+		
 ### Text segment
 		.text
 start:
-		la	$a0, matrix_4x4		# a0 = A (base address of matrix)
-		li	$a1, 4    		   	# a1 = N (number of elements per row)
+		la	$a0, matrix_24x24		# a0 = A (base address of matrix)
+		li	$a1, 24    		   	# a1 = N (number of elements per row)
 #		jal 	print_matrix	   		# Print matrix before elimination
 #		nop					# Delay slot
 		jal 	eliminate			# Triangularize matrix
 		nop					# Delay slot
-		jal 	print_matrix			# Print matrix after elimination
-		nop					# Delay slot
+#		jal 	print_matrix			# Print matrix after elimination
+#		nop					# Delay slot
 		jal 	exit
 
 exit:
@@ -22,72 +34,69 @@ exit:
 #		$a1  - number of elements per row (N)
 
 eliminate:
-		# If necessary, create stack frame, and save return address from ra
-		addiu	$sp, $sp, -16			# Allocate stack frame
-		sw	$s2, 12($sp)			# int k
-		sw	$s1, 8($sp)			# int j
-		sw	$s0, 4($sp)			# int i 	
+		addiu	$sp, $sp, -20			# Allocate stack frame
+		sw	$s2, 16($sp)			# var3
+		sw	$s2, 12($sp)			# var2
+		sw	$s1, 8($sp)			# var1
+		sw	$s0, 4($sp)			# var0 	
 		sw	$ra, 0($sp)			# Done saving registers
 		
 		lwc1	$f5, zero			# f5 = 0.0
 		lwc1	$f6, one			# f6 = 1.0
-		addiu	$s2, $0, 0			# k = 0
-		sll	$t7, $a1, 2			# t7 = N*4
-		multu	$t7, $s2			# N*4*k
-		mflo	$t0				# t0 = N*4*k
-		addu	$t0, $t0, $a0			# t0 = &A[k][0]
+		sll	$s0, $a1, 2			# var0 = N*4
+		addiu	$s1, $s0, -4			# var1 = N*4 - 4 = Width - 1 (this decreases by one word each 'pivots'-loop)
+		multu	$s0, $a1 			# N*N*4
+		mflo	$s2 				# var2 = N*N*4
+		addu	$s2, $s2, $a0 			# var2 = &A[N][0]
+		addu	$s3, $0, $a0			# var3 = &A[k][k]
 pivots:			
-		sll	$t6, $s2, 2			# t6 = k*4
-		addu	$t1, $t0, $t6			# t1 = &A[k][k]
-		lwc1	$f0, 0($t1)			# f0 = A[k][k]
-		swc1	$f6, 0($t1)			# A[k][k] = 1.0
-		addiu	$s1, $s2, 1			# j = k + 1 
+		addu	$t0, $0, $s3			# t0 = &A[k][k]
+		addu	$t4, $s1, $s3			# t4 = &A[k][Width - 1]			
+		lwc1	$f0, 0($t0)			# f0 = A[k][k]
+		swc1	$f6, 0($t0)			# A[k][k] = 1.0
 pivot_row:
-		beq 	$s1, $a1, pivot_row_end		# If j == N, then exit
-		lwc1	$f1, 4($t1)			# f1 = A[k][j]
-		addiu	$s1, $s1, 1			# j++
+		beq 	$t0, $t4, pivot_row_end		# If &A[k][k] == &A[k][N-1], then exit
+		lwc1	$f1, 4($t0)			# f1 = A[k][j]
+		addiu	$t0, $t0, 4			# t0 = t0 + 4
 		div.s	$f1, $f1, $f0			# f1 = A[k][j] / A[k][k]
-		swc1	$f1, 4($t1) 			# A[k][j] = f1
 		b	pivot_row			# Branch to next iteration
-		addiu	$t1, $t1, 4			# t1 = t1 + 4
+		swc1	$f1, 0($t0) 			# A[k][j] = f1 (jumped to next index previously)
 pivot_row_end:	
-		addiu 	$s0, $s2, 1			# i = k + 1
-		multu	$t7, $s0			# N*4*i
-		mflo	$t1				# t1 = N*4*i
-		addu	$t1, $t1, $a0			# t1 = &A[i][0]
+		addu	$t0, $s3, $s0			# t0 = &A[i][k]
 pivot_mat_row:
-		beq 	$s0, $a1, pivot_mat_row_end	# If i == N, then exit
-		addu	$t2, $t0, $t6			# t2 = &A[k][k]
-		addu  	$t3, $t1, $t6			# t3 = &A[i][k]
+		slt	$t1, $t0, $s2			# If &A[i][_] < &A[N][_], t1 = 1, else t1 = 0
+		addu	$t2, $0, $s3			# t2 = &A[k][k] (this got squeezed in to avoid branch hazard)
+		beq 	$t1, $0, pivot_mat_row_end	# If t1 = 0, then exit
+		addu  	$t3, $0, $t0			# t3 = &A[i][k]
 		lwc1	$f0, 0($t3)			# f0 = A[i][k]
 		swc1	$f5, 0($t3)			# A[i][k] = 0.0
-		addiu	$s1, $s2, 1			# j = k + 1
 pivot_mat_col:
-		beq 	$s1, $a1, pivot_mat_col_end	# If j == N, then exit
+		beq 	$t2, $t4, pivot_mat_col_end	# If &A[k][k] == &A[k][N-1], then exit
 		lwc1	$f1, 4($t2)			# f1 = A[k][j]
-		addiu	$s1, $s1, 1			# j++
-		mul.s	$f1, $f0, $f1			# f1 = A[i][k]*A[k][j]
 		lwc1	$f2, 4($t3)			# f2 = A[i][j]
+		mul.s	$f1, $f0, $f1			# f1 = A[i][k]*A[k][j]
 		addiu	$t2, $t2, 4			# t2 = t2 + 4
-		sub.s	$f2, $f1, $f2			# f2 = A[i][j] - A[i][k]*A[k][j]
+		sub.s	$f2, $f2, $f1			# f2 = A[i][j] - A[i][k]*A[k][j]
 		swc1	$f2, 4($t3)			# A[i][j] = f2
 		b	pivot_mat_col			# Branch to next iteration
 		addiu	$t3, $t3, 4			# t3 = t3 + 4
 pivot_mat_col_end:
-		addiu	$s0, $s0, 1			# j++
 		b	pivot_mat_row			# Branch to next iteration
-		addu	$t1, $t1, $t7			# t1 = t1 + N*4
+		addu	$t0, $t0, $s0			# t0 = t0 + N*4
 pivot_mat_row_end:
-		addiu	$s2, $s2, 1			# k++
-		bne	$s2, $a1, pivots		# k != N
-		addu	$t0, $t0, $t7			# t0 = t0 + N*4
+		addu	$s3, $s3, $s0			# s3 = s3 + N*4
+		slt	$t0, $s3, $s2			# If &A[k][_] < &A[N][_], then t0 = 1, else t0 = 0
+		addiu	$s1, $s1, -4			# s1 = s1 - 4
+		bne	$t0, $0, pivots			# If t0 != 0, then branch to next iteration
+		addiu	$s3, $s3, 4			# s3 = s3 + 4
 pivots_end:
 		lw	$ra, 0($sp)			
 		lw 	$s0, 4($sp)
 		lw 	$s1, 8($sp)
-		lw 	$s2, 12($sp)			# Done restoring registers
-		jr		$ra			# return from subroutine
-		addiu	$sp, $sp, 16			# remove stack frame
+		lw 	$s2, 12($sp)
+		lw 	$s3, 16($sp)			# Done restoring registers
+		jr	$ra				# Return from subroutine
+		addiu	$sp, $sp, 20			# Remove stack frame
 
 ################################################################################
 # print_matrix
@@ -99,49 +108,49 @@ pivots_end:
 # the value of $f12 is _not_ preserved across calls.
 #
 # Args:		$a0  - base address of matrix (A)
-#			$a1  - number of elements per row (N) 
+#		$a1  - number of elements per row (N) 
 print_matrix:
-		addiu	$sp,  $sp, -20		# allocate stack frame
-		sw		$ra,  16($sp)
-		sw      $s2,  12($sp)
-		sw		$s1,  8($sp)
-		sw		$s0,  4($sp) 
-		sw		$a0,  0($sp)		# done saving registers
+		addiu	$sp, $sp, -20			# Allocate stack frame
+		sw	$ra, 16($sp)
+		sw      $s2, 12($sp)
+		sw	$s1, 8($sp)
+		sw	$s0, 4($sp) 
+		sw	$a0, 0($sp)			# Done saving registers
 
 		move	$s2,  $a0			# s2 = a0 (array pointer)
 		move	$s1,  $zero			# s1 = 0  (row index)
 loop_s1:
 		move	$s0,  $zero			# s0 = 0  (column index)
 loop_s0:
-		l.s		$f12, 0($s2)        # $f12 = A[s1][s0]
-		li		$v0,  2				# specify print float system call
- 		syscall						# print A[s1][s0]
-		la		$a0,  spaces
-		li		$v0,  4				# specify print string system call
-		syscall						# print spaces
+		l.s	$f12, 0($s2)       		# $f12 = A[s1][s0]
+		li	$v0,  2				# Specify print float system call
+ 		syscall					# Print A[s1][s0]
+		la	$a0,  spaces
+		li	$v0,  4				# Specify print string system call
+		syscall					# Print spaces
 
-		addiu	$s2,  $s2, 4		# increment pointer by 4
+		addiu	$s2,  $s2, 4			# Increment pointer by 4
 
-		addiu	$s0,  $s0, 1        # increment s0
-		blt		$s0,  $a1, loop_s0  # loop while s0 < a1
+		addiu	$s0,  $s0, 1       		# Increment s0
+		blt	$s0,  $a1, loop_s0 		# Loop while s0 < a1
 		nop
-		la		$a0,  newline
-		syscall						# print newline
-		addiu	$s1,  $s1, 1		# increment s1
-		blt		$s1,  $a1, loop_s1  # loop while s1 < a1
+		la	$a0,  newline
+		syscall					# Print newline
+		addiu	$s1,  $s1, 1			# Increment s1
+		blt	$s1,  $a1, loop_s1  		# Loop while s1 < a1
 		nop
-		la		$a0,  newline
-		syscall						# print newline
+		la	$a0,  newline
+		syscall					# Print newline
 
-		lw		$ra,  16($sp)
-		lw		$s2,  12($sp)
-		lw		$s1,  8($sp)
-		lw		$s0,  4($sp)
-		lw		$a0,  0($sp)		# done restoring registers
-		addiu	$sp,  $sp, 20		# remove stack frame
+		lw	$ra,  16($sp)
+		lw	$s2,  12($sp)
+		lw	$s1,  8($sp)
+		lw	$s0,  4($sp)
+		lw	$a0,  0($sp)			# Done restoring registers
+		addiu	$sp,  $sp, 20			# Remove stack frame
 
-		jr		$ra					# return from subroutine
-		nop							# this is the delay slot associated with all types of jumps
+		jr	$ra				# Return from subroutine
+		nop					# This is the delay slot associated with all types of jumps
 
 ### End of text segment
 
@@ -150,9 +159,9 @@ loop_s0:
 		
 ### String constants
 spaces:
-		.asciiz "   "   			# spaces to insert between numbers
+		.asciiz "   "   			# Spaces to insert between numbers
 newline:
-		.asciiz "\n"  				# newline
+		.asciiz "\n"  				# Sewline
 
 ## Floating point numbers ##
 zero:

@@ -1,20 +1,19 @@
 ### Text segment
 		.text
 start:
-		la	$a0, matrix_24x24		# a0 = A (base address of matrix)
-		li	$a1, 24    		    # a1 = N (number of elements per row)
-									# <debug>
-		jal 	print_matrix	    # print matrix before elimination
-		nop							# </debug>
-		jal 	eliminate			# triangularize matrix!
-		nop							# <debug>
-		jal 	print_matrix		# print matrix after elimination
-		nop							# </debug>
+		la	$a0, matrix_4x4		# a0 = A (base address of matrix)
+		li	$a1, 4    		   	# a1 = N (number of elements per row)
+#		jal 	print_matrix	   		# Print matrix before elimination
+#		nop					# Delay slot
+		jal 	eliminate			# Triangularize matrix
+		nop					# Delay slot
+		jal 	print_matrix			# Print matrix after elimination
+		nop					# Delay slot
 		jal 	exit
 
 exit:
-		li   	$v0, 10          	# specify exit system call
-      	syscall						# exit program
+		li   	$v0, 10          		# specify exit system call
+     	 	syscall					# exit program
 
 ################################################################################
 # eliminate - Triangularize matrix.
@@ -24,110 +23,71 @@ exit:
 
 eliminate:
 		# If necessary, create stack frame, and save return address from ra
-		addiu	$sp, $sp, -16			# allocate stack frame
+		addiu	$sp, $sp, -16			# Allocate stack frame
 		sw	$s2, 12($sp)			# int k
 		sw	$s1, 8($sp)			# int j
 		sw	$s0, 4($sp)			# int i 	
-		sw	$ra, 0($sp)			# done saving registers
+		sw	$ra, 0($sp)			# Done saving registers
+		
+		lwc1	$f5, zero			# f5 = 0.0
+		lwc1	$f6, one			# f6 = 1.0
 		addiu	$s2, $0, 0			# k = 0
-pivots:			
-		sll	$t1, $s2, 2			# t1 = k*4
-		multu	$a1, $t1			# N*4*k
+		sll	$t7, $a1, 2			# t7 = N*4
+		multu	$t7, $s2			# N*4*k
 		mflo	$t0				# t0 = N*4*k
 		addu	$t0, $t0, $a0			# t0 = &A[k][0]
-		addu	$t1, $t1, $t0			# t1 = &A[k][k]
-		addu 	$t2, $0, $t1			# t2 = &A[k][k] (permanent copy)
+pivots:			
+		sll	$t6, $s2, 2			# t6 = k*4
+		addu	$t1, $t0, $t6			# t1 = &A[k][k]
 		lwc1	$f0, 0($t1)			# f0 = A[k][k]
+		swc1	$f6, 0($t1)			# A[k][k] = 1.0
 		addiu	$s1, $s2, 1			# j = k + 1 
 pivot_row:
 		beq 	$s1, $a1, pivot_row_end		# If j == N, then exit
 		lwc1	$f1, 4($t1)			# f1 = A[k][j]
-		div.s	$f2, $f1, $f0			# f1 = A[k][j] / A[k][k]
 		addiu	$s1, $s1, 1			# j++
-		swc1	$f2, 4($t1) 			# A[k][j] = f2
+		div.s	$f1, $f1, $f0			# f1 = A[k][j] / A[k][k]
+		swc1	$f1, 4($t1) 			# A[k][j] = f1
 		b	pivot_row			# Branch to next iteration
 		addiu	$t1, $t1, 4			# t1 = t1 + 4
 pivot_row_end:	
-		lwc1 	$f0, one			# f0 = 1.0
-		swc1	$f0, 0($t2)			# A[k][k] = 1.0
-		lwc1	$f3, zero			# f3 = 0.0
-		sll	$t6, $a1, 2			# t6 = N*4
 		addiu 	$s0, $s2, 1			# i = k + 1
-		multu	$t6, $s0			# N*4*i
+		multu	$t7, $s0			# N*4*i
 		mflo	$t1				# t1 = N*4*i
-		sll	$t5, $s2, 2			# t5 = k*4 
 		addu	$t1, $t1, $a0			# t1 = &A[i][0]
-		addu	$t3, $t1, $t5			# t3 = &A[i][k]
-		addu	$t2, $t0, $t5			# t2 = &A[k][k]
 pivot_mat_row:
 		beq 	$s0, $a1, pivot_mat_row_end	# If i == N, then exit
-		lwc1	$f0, 0($t1)			# f0 = A[i][k]
-		addu 	$t1, $0, $t3			# t1 = t3
+		addu	$t2, $t0, $t6			# t2 = &A[k][k]
+		addu  	$t3, $t1, $t6			# t3 = &A[i][k]
+		lwc1	$f0, 0($t3)			# f0 = A[i][k]
+		swc1	$f5, 0($t3)			# A[i][k] = 0.0
 		addiu	$s1, $s2, 1			# j = k + 1
 pivot_mat_col:
 		beq 	$s1, $a1, pivot_mat_col_end	# If j == N, then exit
-		lwc1	$f1, 4($t1)			# f1 = A[i][j]
-		lwc1	$f2, 4($t2)			# f2 = A[k][j]
-		mul.s	$f2, $f0, $f2			# f2 = A[i][k]*A[k][j]
-		sub.s	$f2, $f1, $f2			# f2 = A[i][j] - A[i][k]*A[k][j]
-		addiu	$t2, $t2, 4			# t2 = t2 + 4
+		lwc1	$f1, 4($t2)			# f1 = A[k][j]
 		addiu	$s1, $s1, 1			# j++
-		swc1	$f2, 4($t1)			# A[i][j] = f2
+		mul.s	$f1, $f0, $f1			# f1 = A[i][k]*A[k][j]
+		lwc1	$f2, 4($t3)			# f2 = A[i][j]
+		addiu	$t2, $t2, 4			# t2 = t2 + 4
+		sub.s	$f2, $f1, $f2			# f2 = A[i][j] - A[i][k]*A[k][j]
+		swc1	$f2, 4($t3)			# A[i][j] = f2
 		b	pivot_mat_col			# Branch to next iteration
-		addiu	$t1, $t1, 4			# t3 = t3 + 4
+		addiu	$t3, $t3, 4			# t3 = t3 + 4
 pivot_mat_col_end:
-		swc1	$f3, 0($t3)			# A[i][k] = 0.0
 		addiu	$s0, $s0, 1			# j++
 		b	pivot_mat_row			# Branch to next iteration
-		addu 	$t3, $t3, $t6			# t3 = t3 + N*4
+		addu	$t1, $t1, $t7			# t1 = t1 + N*4
 pivot_mat_row_end:
 		addiu	$s2, $s2, 1			# k++
 		bne	$s2, $a1, pivots		# k != N
-		nop
+		addu	$t0, $t0, $t7			# t0 = t0 + N*4
 pivots_end:
 		lw	$ra, 0($sp)			
 		lw 	$s0, 4($sp)
 		lw 	$s1, 8($sp)
-		lw 	$s2, 12($sp)			# done restoring registers
-		
-		addiu	$sp, $sp, 16			# remove stack frame
-
+		lw 	$s2, 12($sp)			# Done restoring registers
 		jr		$ra			# return from subroutine
-		nop					# this is the delay slot associated with all types of jumps
-
-################################################################################
-# getelem - Get address and content of matrix element A[a][b].
-#
-# Argument registers $a0..$a3 are preserved across calls
-#
-# Args:		$a0  - base address of matrix (A)
-#		$a1  - number of elements per row (N)
-#		$a2  - row number (a)
-#		$a3  - column number (b)
-#						
-# Returns:	$v0  - Address to A[a][b]
-#		$f0  - Contents of A[a][b] (single precision)
-getelem:
-		addiu	$sp, $sp, -12		# allocate stack frame
-		sw	$s2, 8($sp)
-		sw	$s1, 4($sp)
-		sw	$s0, 0($sp)		# done saving registers
-		
-		sll	$s2, $a1, 2		# s2 = 4*N (number of bytes per row)
-		multu	$a2, $s2		# result will be 32-bit unless the matrix is huge
-		mflo	$s1			# s1 = a*s2
-		addu	$s1, $s1, $a0		# Now s1 contains address to row a
-		sll	$s0, $a3, 2		# s0 = 4*b (byte offset of column b)
-		addu	$v0, $s1, $s0		# Now we have address to A[a][b] in v0...
-		l.s	$f0, 0($v0)		# ... and contents of A[a][b] in f0.
-		
-		lw	$s2, 8($sp)
-		lw	$s1, 4($sp)
-		lw	$s0, 0($sp)		# done restoring registers
-		addiu	$sp, $sp, 12		# remove stack frame
-		
-		jr	$ra			# return from subroutine
-		nop				# this is the delay slot associated with all types of jumps
+		addiu	$sp, $sp, 16			# remove stack frame
 
 ################################################################################
 # print_matrix

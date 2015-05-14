@@ -43,7 +43,7 @@ on any square matrix, while it has been specifically optimized for any 24x24 squ
 It is optimized to yield the most efficient execution, whilst keeping the price as low as
 possible. Therefore the performance has often been compromised in favour of cheaper components.
 
-The software will reduce the matrix to an {\it upper triangle form}, which is characterized
+The software will reduce the matrix to {\it upper triangle form}, which is characterized
 as a matrix with it's diagonal containing only ones, and all elements below the diagonal
 containing only zeros. The second step in the elimination process, {\it back substitution},
 is not handled by this system.
@@ -54,16 +54,16 @@ is heavily dependent on how the program is executed, therefore the program have 
 rewritten in such way that it would be beneficial for an optimal hardware configuration.
 
 \subsection{Software}
-The algorithm iterates the matrix in several different loops. The outermost loop iterates along
-the diagonal ({\it the pivot elements}) of the matrix. In each loop, we do the two following
+The algorithm iterates through the matrix in several different loops. The outermost loop iterates along
+the main diagonal ({\it the pivot elements}) of the matrix. In each loop, we do the two following
 operations; we minimize the current row by dividing each element with the pivot element, and then we
 subtract each underlying row with the previously minimized row multiplied with the respective
 pivot elements. By the end of the first outmost loop, we end up with a matrix with the first pivot
 element as a one, and all the elements below it as zeros, with the first row in its final form.
 Then successively after each row being computed, we will end up with our result matrix.
 
-The first approach for writing the program was to directly translate the given C-code to Assembler,
-and not bothering about any optimizations. After confirming that we had a working program, we started
+The first approach for writing the program was to directly translate an elimination algorithm written in C-code to Assembler,
+and not bother with any optimizations. After confirming that we had a working program, we started
 find places in the code where we could do something to speed up the performance. One optimization we
 made in the beginning, was to convert the use of arrays into pointers instead. With arrays, you have
 to calculate each new address for every iteration of the loop. This will increase the number of

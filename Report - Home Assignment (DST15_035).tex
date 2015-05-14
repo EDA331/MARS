@@ -1,0 +1,145 @@
+\documentclass[a4paper,9pt,fleqn]{article}
+
+\usepackage{mathtools}
+\usepackage{tabularx}
+\usepackage{enumerate}
+\usepackage[retainorgcmds]{IEEEtrantools}
+\usepackage{tikz}
+	\usetikzlibrary{automata, shapes, snakes}
+\usepackage{pgf}
+\usepackage{hyperref}
+
+\setlength{\parindent}{0mm}
+\setlength{\itemsep}{0ex}
+\setlength{\parskip}{2ex}
+\setlength{\parsep}{2ex}
+\setlength{\partopsep}{0ex}
+\setlength{\topsep}{0ex}
+
+\title{
+{\bf Report}\\
+\vspace{0.2cm}
+%
+Home Assignment, DST15\_035\\
+\vspace{1cm}
+%
+{\large Dennis Bennhage \& Hampus Lidin}\\
+\vspace{10cm}
+%
+May 14th, 2015
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+\section{System Overview}
+The system we have constructed is intended to perform the first step in {\it Gauss elimination}
+on any square matrix, while it has been specifically optimized for any 24x24 square matrix.
+It is optimized to yield the most efficient execution, whilst keeping the price as low as
+possible. Therefore the performance has often been compromised in favour of cheaper components.
+
+The software will reduce the matrix to an {\it upper triangle form}, which is characterized
+as a matrix with it's diagonal containing only ones, and all elements below the diagonal
+containing only zeros. The second step in the elimination process, {\it back substitution},
+is not handled by this system.
+
+\section{Optimization}
+Both software and hardware have been in consideration when optimizing the system. The hardware
+is heavily dependent on how the program is executed, therefore the program have been 
+rewritten in such way that it would be beneficial for an optimal hardware configuration.
+
+\subsection{Software}
+The algorithm iterates the matrix in several different loops. The outermost loop iterates along
+the diagonal ({\it the pivot elements}) of the matrix. In each loop, we do the two following
+operations; we minimize the current row by dividing each element with the pivot element, and then we
+subtract each underlying row with the previously minimized row multiplied with the respective
+pivot elements. By the end of the first outmost loop, we end up with a matrix with the first pivot
+element as a one, and all the elements below it as zeros, with the first row in its final form.
+Then successively after each row being computed, we will end up with our result matrix.
+
+The first approach for writing the program was to directly translate the given C-code to Assembler,
+and not bothering about any optimizations. After confirming that we had a working program, we started
+find places in the code where we could do something to speed up the performance. One optimization we
+made in the beginning, was to convert the use of arrays into pointers instead. With arrays, you have
+to calculate each new address for every iteration of the loop. This will increase the number of
+instructions executed in each loop, especially in the most deep-nested loops. In the algorithm we
+use, we have a loop nested inside two other loops, which will add up to a lot of clock cycles in the
+end. By using pointers instead, we can omit the use of indices of the arrays, and instead only
+increment the address by one byte.
+
+After running the program with the provided PET-tool, we could analyze if we had any {\it branch
+hazards} or {\it load-use hazards}. Branch hazards occur when an instruction calculates a value
+for a conditional branch, that is directly subsequent. The CPU will then have to stall one clock
+cycle due to the delay in the pipeline, which is a waste of performance. By reordering the
+instructions, for example inserting a completely independent instruction in between, we can avoid
+this type of hazard. Load-use hazards work in a similar way; when loading a value to a register,
+then immediately using it in another instruction, the CPU will have to stall one clock cycle.
+
+\section{Results} \label{res}
+
+
+\begin{table}   
+\centering
+\scriptsize
+\def\arraystretch{1.1}              
+\begin{tabularx}{14cm}{X|cccccc|cccccc}
+              & \multicolumn{6}{c|}{\bf Gothenburg}                                   & \multicolumn{6}{c}{\bf Stockholm}                                    \\ \hline
+{\bf Year}    & {\bf Jan} & {\bf Feb} & {\bf Mar} & {\bf Apr} & {\bf May} & {\bf Jun} & {\bf Jan} & {\bf Feb} & {\bf Mar} & {\bf Apr} & {\bf May} & {\bf Jun} \\ \hline
+{\bf 2002}    & 153       & 95        & 48        & 27        & 71        & 116       & 65        & 42        & 28        & 8         & 34        & 94        \\
+{\bf 2003}    & 71        & 34        & 21        & 96        & 77        & 64        & 19        & 21        & 2         & 44        & 58        & 44        \\
+{\bf 2004}    & 65        & 38        & 61        & 36        & 27        & 83        & 37        & 29        & 25        & 13        & 47        & 108       \\
+{\bf 2005}    & 126       & 43        & 41        & 25        & 39        & 73        & 44        & 38        & 14        & 11        & 56        & 72        \\
+{\bf 2006}    & 66        & 41        & 52        & 94        & 71        & 42        & 10        & 29        & 28        & 28        & 46        & 32        \\
+{\bf 2007}    & 159       & 28        & 81        & 40        & 57        & 130       & 73        & 26        & 19        & 17        & 25        & 67        \\
+{\bf 2008}    & 166       & 89        & 108       & 33        & 11        & 67        & 69        & 23        & 41        & 28        & 17        & 56        \\
+{\bf 2009}    & 57        & 31        & 48        & 11        & 80        & 58        & 21        & 24        & 36        & 5         & 25        & 80        \\
+{\bf 2010}    & 30        & 48        & 46        & 32        & 31        & 53        & 26        & 29        & 22        & 23        & 31        & 33        \\
+{\bf 2011}    & 72        & 65        & 40        & 34        & 67        & 58        & 33        & 38        & 11        & 10        & 34        & 57        \\
+{\bf 2012}    & 88        & 55        & 9         & 75        & 74        & 95        & 42        & 45        & 18        & 62        & 20        & 160       \\
+{\bf 2013}    & 44        & 17        & 3         & 46        & 73        & 139       & 29        & 30        & 3         & 27        & 17        & 46        \\
+{\bf 2014}    & 66        & 107       & 32        & 47        & 81        & 52        & 39        & 35        & 43        & 25        & 35        & 28        \\ \hline
+{\bf Average} & 89        & 53        & 45        & 46        & 58        & 79        & 39        & 31        & 22        & 23        & 34        & 67        \\ \hline
+{\bf Normal value \newline
+(1961-1990)}  & 61        & 40        & 49        & 41        & 49        & 59        & 39        & 27        & 26        & 30        & 30        & 45 \\
+\end{tabularx}
+\vspace{0.5cm}
+
+\begin{tabularx}{14cm}{X|cccccc|cccccc}
+{\bf Year}    & {\bf Jul} & {\bf Aug} & {\bf Sep} & {\bf Oct} & {\bf Nov} & {\bf Dec} & {\bf Jul} & {\bf Aug} & {\bf Sep} & {\bf Oct} & {\bf Nov} & {\bf Dec} \\ \hline
+{\bf 2002}    & 101       & 35        & 17        & 86        & 82        & 16        & 114       & 4         & 13        & 45        & 32        & 9         \\
+{\bf 2003}    & 143       & 32        & 25        & 101       & 76        & 119       & 75        & 53        & 20        & 32        & 43        & 78        \\
+{\bf 2004}    & 98        & 128       & 100       & 115       & 82        & 76        & 55        & 49        & 39        & 45        & 47        & 40        \\
+{\bf 2005}    & 107       & 83        & 60        & 75        & 93        & 53        & 122       & 65        & 11        & 28        & 44        & 54        \\
+{\bf 2006}    & 78        & 190       & 55        & 202       & 179       & 193       & 33        & 146       & 23        & 98        & 43        & 34        \\
+{\bf 2007}    & 129       & 56        & 121       & 47        & 82        & 108       & 51        & 17        & 74        & 39        & 48        & 45        \\
+{\bf 2008}    & 57        & 167       & 81        & 142       & 100       & 37        & 42        & 154       & 27        & 64        & 63        & 50        \\
+{\bf 2009}    & 170       & 79        & 56        & 84        & 128       & 53        & 89        & 54        & 32        & 68        & 52        & 45        \\ 
+{\bf 2010}    & 159       & 118       & 74        & 130       & 80        & 48        & 74        & 105       & 73        & 34        & 58        & 45        \\
+{\bf 2011}    & 121       & 156       & 129       & 107       & 39        & 146       & 13        & 90        & 60        & 44        & 14        & 75        \\
+{\bf 2012}    & 97        & 88        & 146       & 146       & 92        & 78        & 61        & 121       & 58        & 72        & 56        & 66        \\
+{\bf 2013}    & 51        & 49        & 56        & 106       & 72        & 154       & 43        & 55        & 39        & 58        & 61        & 51        \\
+{\bf 2014}    & 39        & 142       & 36        &           &           &           & 44        & 115       & 83        &           &           &           \\ \hline
+{\bf Average} & 104       & 102       & 74        & 103       & 85        & 83        & 63        & 79        & 42        & 48        & 43        & 46        \\ \hline
+{\bf Normal value \newline
+(1961-1990)}  & 68        & 75        & 80       & 83         & 82        & 72        & 72        & 66        & 55        & 50        & 53        & 46        \\
+\end{tabularx}
+\caption{Precipitation, mm/month}
+\label{tab:gbg/sthlm}
+\end{table}
+
+
+\begin{thebibliography}{3}
+\bibitem{smhi}     Monthly observations of precipitation 2002-2014, SMHI.                                \\
+                   \url{http://data.smhi.se/met/climate/time_series/month/vov_pdf/}, \mbox{visited} 2014-10-12.
+\bibitem{wmo}      Climate Data and Data Related Products, WMO.                                                     \\
+                   \url{http://www.wmo.int/pages/themes/climate/climate_data_and_products.php}, \mbox{visited} 2014-10-11.
+\bibitem{critical} Student t-Value Calculator, Dr. Daniel Soper, 2014.                                      \\
+                   \url{http://www.danielsoper.com/statcalc3/calc.aspx?id=10},
+                   \mbox{visited} 2014-10-12.
+\end{thebibliography}
+\end{document}

@@ -14,11 +14,10 @@
 		.text
 start:
 		la	$a0, matrix_24x24		# a0 = A (base address of matrix)
-		li	$a1, 24    		   	# a1 = N (number of elements per row)
 #		jal 	print_matrix	   		# Print matrix before elimination
 #		nop					# Delay slot
 		jal 	eliminate			# Triangularize matrix
-		nop					# Delay slot
+		addiu	$a1, $0, 24    			# a1 = N (number of elements per row)
 #		jal 	print_matrix			# Print matrix after elimination
 #		nop					# Delay slot
 		jal 	exit
@@ -56,7 +55,7 @@ pivots:
 		swc1	$f6, 0($t0)			# A[k][k] = 1.0
 pivot_row:
 		beq 	$t0, $t4, pivot_row_end		# If &A[k][k] == &A[k][N-1], then exit
-		lwc1	$f1, 4($t0)			# f1 = A[k][j]
+		lwc1	$f1, 4($t0)			# f1 = A[k][j] (this will take one extra access per loop; however it's the best solution)
 		addiu	$t0, $t0, 4			# t0 = t0 + 4
 		div.s	$f1, $f1, $f0			# f1 = A[k][j] / A[k][k]
 		b	pivot_row			# Branch to next iteration
@@ -72,14 +71,14 @@ pivot_mat_row:
 		swc1	$f5, 0($t3)			# A[i][k] = 0.0
 pivot_mat_col:
 		beq 	$t2, $t4, pivot_mat_col_end	# If &A[k][k] == &A[k][N-1], then exit
+		addiu	$t3, $t3, 4			# t3 = t3 + 4 (squeezed this in so we don't get unwanted memory accesses after loop is done)
 		lwc1	$f1, 4($t2)			# f1 = A[k][j]
-		lwc1	$f2, 4($t3)			# f2 = A[i][j]
+		lwc1	$f2, 0($t3)			# f2 = A[i][j] (jumped to next index previously)
 		mul.s	$f1, $f0, $f1			# f1 = A[i][k]*A[k][j]
 		addiu	$t2, $t2, 4			# t2 = t2 + 4
 		sub.s	$f2, $f2, $f1			# f2 = A[i][j] - A[i][k]*A[k][j]
-		swc1	$f2, 4($t3)			# A[i][j] = f2
 		b	pivot_mat_col			# Branch to next iteration
-		addiu	$t3, $t3, 4			# t3 = t3 + 4
+		swc1	$f2, 0($t3)			# A[i][j] = f2
 pivot_mat_col_end:
 		b	pivot_mat_row			# Branch to next iteration
 		addu	$t0, $t0, $s0			# t0 = t0 + N*4

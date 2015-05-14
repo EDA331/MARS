@@ -8,13 +8,14 @@
 	\usetikzlibrary{automata, shapes, snakes}
 \usepackage{pgf}
 \usepackage{hyperref}
-
 \setlength{\parindent}{0mm}
 \setlength{\itemsep}{0ex}
 \setlength{\parskip}{2ex}
 \setlength{\parsep}{2ex}
 \setlength{\partopsep}{0ex}
 \setlength{\topsep}{0ex}
+
+
 
 \title{
 {\bf Report}\\
@@ -80,7 +81,58 @@ instructions, for example inserting a completely independent instruction in betw
 this type of hazard. Load-use hazards work in a similar way; when loading a value to a register,
 then immediately using it in another instruction, the CPU will have to stall one clock cycle.
 
-\section{Results} \label{res}
+\subsection{Hardware}
+When we were choosing the components we had to consider several things. Since the goal of this project was to get the best
+performance for as cheap as possible, we could not simply try to get the fastest execution time possible. With this in mind,
+we tested several different configurations. In the following subsections we describe our thought process when deciding
+which hardware configuration to use.
+
+\subsubsection{Memory}
+Since the entire 24x24 matrix is stored in memory we have to read memory every time we need a new value from the matrix,
+and write to memory every time we want to update a value in the matrix. This adds up to a lot of memory accesses, so a 
+fast memory is going to greatly improve the execution time. 
+
+\subsubsection{I-Cache}
+There are not many instructions in the loops in our program. A large I-Cache is not necessary to store the instructions of each loop
+while it is running, which means that a larger cache is not going to be a big enough performance increase to make the price increase
+worth it.
+
+\subsubsection{D-Cache}
+We had to hit a balance between price and performance here. Larger cache gives better execution times, 
+since there is such a large amount of memory accesses, but the price increase is steeper than the performance increase. 
+
+
+\subsection{Results}
+Här lägger vi in alla testresultat och visar vilken som är bäst etc.
+
+After trying a lot of different configuration, this was the best one we could find:
+
+\begin{table}
+\begin{tabular}{l|l|l|}
+{\bf Configuration} \\ \hline
+I-Cache size(words) & 32 \\ \hline
+I-Cache associativity & 1 \\ \hline
+I-Cache block size(words) & 4 \\ \hline
+D-Cache size(words) & 64 \\ \hline
+D-Cache associativity & 2 \\ \hline
+D-Cache block size(words) & 4 \\ \hline
+Processor frequency(MHz) & 450 \\ \hline
+Memory access time(ns, first/other) &  30 / 6\\ \hline
+Write buffer Size(words) & 4 \\ \hline
+{\bf Results} & \\ \hline
+Clock cycles & 140 314 \\ \hline
+Execution time(\mu s) & 311.809 \\ \hline
+Total component cost & 3.37 \\ \hline
+Price x performance(\mu sC\$) & 1050.796\\ \hline
+\end{tabular}
+\end{table}
+
+
+
+
+
+
+
 
 
 \begin{table}   

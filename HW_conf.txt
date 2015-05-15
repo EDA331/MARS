@@ -7,9 +7,9 @@ I-Cache)
 	Cache block size (words):	4
 	Cache size (words):		32
 
-	Memory access count:		43 746
-	Cache hit count:		43 683
-	Cache miss count:		63
+	Memory access count:		38 793
+	Cache hit count:		38 778
+	Cache miss count:		15
 	Cache hit rate:			100%
 
 	Price:				0 C$
@@ -22,9 +22,9 @@ D-Cache)
 	Cache block size (words):	4
 	Cache size (words):		64
 
-	Memory access count:		14 160
-	Cache hit count:		12 863
-	Cache miss count:		1 297
+	Memory access count:		14 130
+	Cache hit count:		12 859
+	Cache miss count:		1 271
 	Cache hit rate:			91%
 
 	Price:				0.25 C$	
@@ -43,18 +43,18 @@ Memory)
 
 Evaluation)
 	Clock cycles)
-		I-Cache misses:			3 024
-		D-Cache misses:			62 256
+		I-Cache misses:			720
+		D-Cache misses:			61 008
 		Load-use hazards:		0
 		Branch hazards:			0
 		Floating point stalls:		20 332
-		Not enough write buffer space:	10 956
-		Instructions:			43 746
+		Not enough write buffer space:	11 316
+		Instructions:			38 793
 
-		Total:				140 314
+		Total:				132 169
 
 	Score)
-		Total execution time:		140 314 / 450 = 311.809 µs
+		Total execution time:		132 169 / 450 = 293.709 µs
 		Total price:			0 + 0.25 + 2 + 1.12 = 3.37 C$
 	
-		Total component cost:		311.809 * 3.37 = 1 050.796 µsC$
+		Total component cost:		293.709 * 3.37 = 989.799 µsC$

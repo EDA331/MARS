@@ -3,6 +3,7 @@
 #### Dennis Bennhage,	bennhage@student.chalmers.se
 #### Hampus Lidin, 	lidin@student.chalmers.se
 #### 13/5-15
+
 #
 # I-Cache:	Direct mapped, 128 bytes, 8 blocks (16-byte blocks), LRU replacement policy
 # D-Cache: 	2-way, 256 bytes, 16 blocks (16-byte blocks), LRU replacement policy 
@@ -18,7 +19,7 @@ start:
 #		nop					# Delay slot
 		jal 	eliminate			# Triangularize matrix
 		addiu	$a1, $0, 24    			# a1 = N (number of elements per row)
-#		jal 	print_matrix			# Print matrix after elimination
+# 		jal 	print_matrix			# Print matrix after elimination
 #		nop					# Delay slot
 		jal 	exit
 
@@ -33,69 +34,61 @@ exit:
 #		$a1  - number of elements per row (N)
 
 eliminate:
-		addiu	$sp, $sp, -20			# Allocate stack frame
-		sw	$s2, 16($sp)			# var3
-		sw	$s2, 12($sp)			# var2
-		sw	$s1, 8($sp)			# var1
-		sw	$s0, 4($sp)			# var0 	
-		sw	$ra, 0($sp)			# Done saving registers
-		
+		addiu	$sp, $sp, -8			# Allocate stack frame
+		sw	$s1, 4($sp)			# var1
+		sw	$s0, 0($sp)			# var0, done saving registers
 		lwc1	$f5, zero			# f5 = 0.0
 		lwc1	$f6, one			# f6 = 1.0
-		sll	$s0, $a1, 2			# var0 = N*4
-		addiu	$s1, $s0, -4			# var1 = N*4 - 4 = Width - 1 (this decreases by one word each 'pivots'-loop)
-		multu	$s0, $a1 			# N*N*4
-		mflo	$s2 				# var2 = N*N*4
-		addu	$s2, $s2, $a0 			# var2 = &A[N][0]
-		addu	$s3, $0, $a0			# var3 = &A[k][k]
+		sll	$t7, $a1, 2			# t7 = N*4
+		addiu	$t6, $t7, -4			# t6 = N*4 - 4 = Width - 1 (this decreases by one word each 'pivots'-loop)
+		addiu	$t5, $t7, 4			# t5 = N*4 + 4
+		multu	$t7, $a1 			# N*N*4
+		mflo	$s0 				# var0 = N*N*4
+		addu	$s0, $s0, $a0 			# var0 = &A[N][0]
+		addu	$s1, $0, $a0			# var1 = &A[k][k]
 pivots:			
-		addu	$t0, $0, $s3			# t0 = &A[k][k]
-		addu	$t4, $s1, $s3			# t4 = &A[k][Width - 1]			
+		addu	$t0, $0, $s1			# t0 = &A[k][k]
+		addu	$t4, $t6, $s1			# t4 = &A[k][N-1]	
 		lwc1	$f0, 0($t0)			# f0 = A[k][k]
+		beq 	$t0, $t4, pivot_row_end		# If &A[k][k] == &A[k][N-1], then exit
 		swc1	$f6, 0($t0)			# A[k][k] = 1.0
 pivot_row:
-		beq 	$t0, $t4, pivot_row_end		# If &A[k][k] == &A[k][N-1], then exit
-		lwc1	$f1, 4($t0)			# f1 = A[k][j] (this will take one extra access per loop; however it's the best solution)
-		addiu	$t0, $t0, 4			# t0 = t0 + 4
+		lwc1	$f1, 4($t0)			# f1 = A[k][j]
+		addiu	$t0, $t0, 4			# t0 = t0 + 4 (squeezed in to avoid load-use hazard)
 		div.s	$f1, $f1, $f0			# f1 = A[k][j] / A[k][k]
-		b	pivot_row			# Branch to next iteration
+		bne	$t0, $t4, pivot_row		# If &A[k][k] != &A[k][N-1], then branch to next iteration
 		swc1	$f1, 0($t0) 			# A[k][j] = f1 (jumped to next index previously)
 pivot_row_end:	
-		addu	$t0, $s3, $s0			# t0 = &A[i][k]
+		addu	$t1, $s1, $t7			# t1 = &A[i][k]
 pivot_mat_row:
-		slt	$t1, $t0, $s2			# If &A[i][_] < &A[N][_], t1 = 1, else t1 = 0
-		addu	$t2, $0, $s3			# t2 = &A[k][k] (this got squeezed in to avoid branch hazard)
-		beq 	$t1, $0, pivot_mat_row_end	# If t1 = 0, then exit
-		addu  	$t3, $0, $t0			# t3 = &A[i][k]
+		slt 	$t0, $t1, $s0			# If &A[i][k] < &A[N][0], then t0 = 1, else t0 = 0
+		addu	$t2, $0, $s1			# t2 = &A[k][k] (squeezed in to avoid branch hazard)
+		beq 	$t0, $0, pivot_mat_row_end	# If t0 = 0, then exit
+		addu  	$t3, $0, $t1			# t3 = &A[i][k]
 		lwc1	$f0, 0($t3)			# f0 = A[i][k]
+		beq 	$t2, $t4, pivot_mat_col_end	# If &A[k][k] == &A[k][N-1], then exit
 		swc1	$f5, 0($t3)			# A[i][k] = 0.0
 pivot_mat_col:
-		beq 	$t2, $t4, pivot_mat_col_end	# If &A[k][k] == &A[k][N-1], then exit
-		addiu	$t3, $t3, 4			# t3 = t3 + 4 (squeezed this in so we don't get unwanted memory accesses after loop is done)
 		lwc1	$f1, 4($t2)			# f1 = A[k][j]
-		lwc1	$f2, 0($t3)			# f2 = A[i][j] (jumped to next index previously)
-		mul.s	$f1, $f0, $f1			# f1 = A[i][k]*A[k][j]
+		lwc1	$f2, 4($t3)			# f2 = A[i][j]
 		addiu	$t2, $t2, 4			# t2 = t2 + 4
+		mul.s	$f1, $f0, $f1			# f1 = A[i][k]*A[k][j]
 		sub.s	$f2, $f2, $f1			# f2 = A[i][j] - A[i][k]*A[k][j]
-		b	pivot_mat_col			# Branch to next iteration
-		swc1	$f2, 0($t3)			# A[i][j] = f2
+		swc1	$f2, 4($t3)			# A[i][j] = f2
+		bne	$t2, $t4, pivot_mat_col		# If &A[k][k] != &A[k][N-1], then branch to next iteration
+		addiu	$t3, $t3, 4			# t3 = t3 + 4
 pivot_mat_col_end:
 		b	pivot_mat_row			# Branch to next iteration
-		addu	$t0, $t0, $s0			# t0 = t0 + N*4
+		addu	$t1, $t1, $t7			# t1 = t1 + N*4
 pivot_mat_row_end:
-		addu	$s3, $s3, $s0			# s3 = s3 + N*4
-		slt	$t0, $s3, $s2			# If &A[k][_] < &A[N][_], then t0 = 1, else t0 = 0
-		addiu	$s1, $s1, -4			# s1 = s1 - 4
-		bne	$t0, $0, pivots			# If t0 != 0, then branch to next iteration
-		addiu	$s3, $s3, 4			# s3 = s3 + 4
+		addu	$s1, $s1, $t5			# s1 = s1 + N*4 + 4
+		bne	$t6, $0, pivots			# If the "width-1"-variable has decreased to 0, then branch to next iteration
+		addiu	$t6, $t6, -4			# t6 = t6 - 4
 pivots_end:
-		lw	$ra, 0($sp)			
-		lw 	$s0, 4($sp)
-		lw 	$s1, 8($sp)
-		lw 	$s2, 12($sp)
-		lw 	$s3, 16($sp)			# Done restoring registers
+		lw 	$s0, 0($sp)
+		lw 	$s1, 4($sp)			# Done restoring registers
 		jr	$ra				# Return from subroutine
-		addiu	$sp, $sp, 20			# Remove stack frame
+		addiu	$sp, $sp, 8			# Remove stack frame
 
 ################################################################################
 # print_matrix

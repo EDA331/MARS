@@ -153,7 +153,7 @@ loop_s0:
 spaces:
 		.asciiz "   "   			# Spaces to insert between numbers
 newline:
-		.asciiz "\n"  				# Sewline
+		.asciiz "\n"  				# New line
 
 ## Floating point numbers ##
 zero:

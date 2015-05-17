@@ -52,34 +52,66 @@ is not handled by this system.
 \section{Optimization}
 Both software and hardware have been in consideration when optimizing the system. The hardware
 is heavily dependent on how the program is executed, therefore the program have been 
-rewritten in such way that it would be beneficial for an optimal hardware configuration.
+written in such way that it would be beneficial for an optimal hardware configuration. We will
+also see that the software has to adjust for the hardware component costs sometimes as well.
 
 \subsection{Software}
 The algorithm iterates through the matrix in several different loops. The outermost loop iterates along
-the main diagonal ({\it the pivot elements}) of the matrix. In each loop, we do the two following
-operations; we minimize the current row by dividing each element with the pivot element, and then we
-subtract each underlying row with the previously minimized row multiplied with the respective
-pivot elements. By the end of the first outmost loop, we end up with a matrix with the first pivot
-element as a one, and all the elements below it as zeros, with the first row in its final form.
-Then successively after each row being computed, we will end up with our result matrix.
+the main diagonal (i.e. the {\it pivot elements}) of the matrix. In each loop, we do the two following
+operations; we minimize the current row (let's call it the top row) by dividing each element with the
+pivot element, and then we subtract each underlying row with their respective pivot elements multiplied
+by the top row. By the end of the first outmost loop, we end up with a matrix that has a computed top row,
+and thus its pivot element being a one and all the elements below the pivot being zeros. Then successively
+after each row gets computed, we will end up with our result matrix.
 
-The first approach for writing the program was to directly translate an elimination algorithm written in C-code to Assembler,
-and not bother with any optimizations. After confirming that we had a working program, we started
-find places in the code where we could do something to speed up the performance. One optimization we
-made in the beginning, was to convert the use of arrays into pointers instead. With arrays, you have
-to calculate each new address for every iteration of the loop. This will increase the number of
-instructions executed in each loop, especially in the most deep-nested loops. In the algorithm we
-use, we have a loop nested inside two other loops, which will add up to a lot of clock cycles in the
-end. By using pointers instead, we can omit the use of indices of the arrays, and instead only
-increment the address by one byte.
+The first approach for writing the program was to directly translate an elimination algorithm written
+in C-code to Assembler, and not bother with any optimizations. After confirming that we had a working
+program, we started to find places in the code where we could do something to speed up the performance.
+We realized that since we had many loops in our program, we'd want to push out or eliminate as many
+instructions from the loops as possible. One way we had done this, was to convert the arrays
+into pointers instead. With arrays, you have to calculate each new address for every iteration of the loop.
+This will increase the number of instructions executed in each loop (the {\it overhead}). When using
+deep-nested loops as we do in our algorithm, it will add up to a lot of instructions, or clock cycles if
+you will, in the end. By using pointers instead, we could omit the use of indices of the arrays, and instead
+only increment the address by one byte. This minimized the overhead of the loops, since we only had to
+keep track of the address of the current element in the array.
 
-After running the program with the provided PET-tool, we could analyze if we had any {\it branch
-hazards} or {\it load-use hazards}. Branch hazards occur when an instruction calculates a value
-for a conditional branch, that is directly subsequent. The CPU will then have to stall one clock
-cycle due to the delay in the pipeline, which is a waste of performance. By reordering the
-instructions, for example inserting a completely independent instruction in between, we can avoid
+After running the program with the provided {\it Performance Evaluation Tool} (PET), we could analyze if
+we had any {\it branch hazards} or {\it load-use hazards}. Branch hazards occur when an instruction
+calculates a value for a conditional branch, that is directly subsequent. The CPU will then have to stall
+one clock cycle due to the delay in the pipeline, which is a waste of performance. By reordering the
+instructions, for example inserting a completely independent instruction in between, we could avoid
 this type of hazard. Load-use hazards work in a similar way; when loading a value to a register,
 then immediately using it in another instruction, the CPU will have to stall one clock cycle.
+
+Utilizing all the registers that were at hand was also a great way to optimize the performance. By having
+commonly calculated addresses and values stored in registers (such as the loop limit address), we could
+peel of some instructions from the code. Our goal was to reduce the program to only consist of the absolutely
+necessary instructions, and make sure that values used often only got calculated once. We found out later that
+it would be very important to make sure that  all instructions, that were contained in the outermost loop, could
+fit inside the {\it Instruction Cache} memory unit (I-Cache). If we only could reduce the instructions
+to fit in the cache, we would almost exclusively get a 100\% {\it hit rate}. High hit rates
+greatly  improve performance by only wasting relatively few clock cycles for fetching instructions from the
+main memory.
+
+To achieve this goal of going under the limit, we had to often think of ways to execute one function of the
+program in a different way, whilst still getting an identical result. A good source of improvement was to look
+at how the {\it branching} of the program was executed. In the beginning we had two branch-instructions in each
+loop; one for checking a condition for exiting the loop, and one to jump to the beginning of the loop. The reason
+we initially designed it like this was that sometimes we didn't wanted to enter the loop at all, if the condition was
+met (for exiting the loop) at the start. If we hadn't checked in the beginning of the loop, we would've had unwanted
+execution of the program. They way we improved this was to move the condition branch outside the loop instead, and
+checked the reverse condition (the condition to branch to the next iteration) in the end of the loop.
+
+By following these optimization guidelines, we were able to construct a program that would fit in an optimal
+configuration of the I-Cache. But sometimes it was not always good to shorten the program too much. We actually
+had to restrict the program to a certain structure, as we only had limited component specifications. We found
+out that if we would read/write data from/to the memory too often, we would fill the memory {\it write buffer} too fast,
+resulting in the program having to wait for the memory to finish. By reducing the loops, we not only made the loop
+execute faster, we also brought the read- and write-instructions closer. This created a bottleneck, which outweighed
+the possible performance boost that we would get. For that reason we left out some optimization opportunities in
+favour for an optimal hardware configuration. But what was our optimal configuration? That is what we will discuss in
+the next chapter.
 
 \subsection{Hardware}
 When we were choosing the components we had to consider several things. Since the goal of this project was to get the best

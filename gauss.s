@@ -1,15 +1,16 @@
 #### Chalmers Tekniska Högskola
 #### EDA331 - Datorsystemteknik
+####
+#### Grupp DST15_035
 #### Dennis Bennhage,	bennhage@student.chalmers.se
 #### Hampus Lidin, 	lidin@student.chalmers.se
-#### 13/5-15
-
+#### 17:e maj 2015
 #
-# I-Cache:	Direct mapped, 128 bytes, 8 blocks (16-byte blocks), LRU replacement policy
-# D-Cache: 	2-way, 256 bytes, 16 blocks (16-byte blocks), LRU replacement policy 
-# CPU:		450 MHz
-# Memory:	30 cycles first time access, 6 cycles succeeding access, 16-byte write buffer
-# Evaluation:	Price 3.37 C$, execution time 313.264 µs, total component cost 1 055.701 µsC$
+# I-Cache:	Direct mapped, 128 bytes, 8 blocks (16-byte blocks), LRU replacement policy.
+# D-Cache: 	2-way, 256 bytes, 16 blocks (16-byte blocks), LRU replacement policy.
+# CPU:		450 MHz.
+# Memory:	30 cycles first time access, 6 cycles succeeding access, 16-byte write buffer.
+# Evaluation:	Price 3.37 C$, execution time 293.709 µs, total component cost 989.799 µsC$.
 		
 ### Text segment
 		.text
@@ -34,6 +35,9 @@ exit:
 #		$a1  - number of elements per row (N)
 
 eliminate:
+		nop					# Padding to synchronize I-Cache
+		nop					# Padding to synchronize I-Cache
+		nop					# Padding to synchronize I-Cache
 		addiu	$sp, $sp, -8			# Allocate stack frame
 		sw	$s1, 4($sp)			# var1
 		sw	$s0, 0($sp)			# var0, done saving registers

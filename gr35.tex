@@ -1,11 +1,8 @@
 \documentclass[a4paper,9pt,fleqn]{article}
 
 \usepackage{mathtools}
-\usepackage{tabularx}
 \usepackage{enumerate}
 \usepackage[retainorgcmds]{IEEEtrantools}
-\usepackage{tikz}
-	\usetikzlibrary{automata, shapes, snakes}
 \usepackage{pgf}
 \usepackage{hyperref}
 \setlength{\parindent}{0mm}
@@ -14,8 +11,6 @@
 \setlength{\parsep}{2ex}
 \setlength{\partopsep}{0ex}
 \setlength{\topsep}{0ex}
-
-
 
 \title{
 {\bf Report}\\
@@ -27,7 +22,7 @@ Home Assignment, DST15\_035\\
 {\large Dennis Bennhage \& Hampus Lidin}\\
 \vspace{10cm}
 %
-May 14th, 2015
+May 17th, 2015
 }
 
 \date{}
@@ -56,13 +51,14 @@ written in such way that it would be beneficial for an optimal hardware configur
 also see that the software has to adjust for the hardware component costs sometimes as well.
 
 \subsection{Software}
-The algorithm iterates through the matrix in several different loops. The outermost loop iterates along
-the main diagonal (i.e. the {\it pivot elements}) of the matrix. In each loop, we do the two following
-operations; we minimize the current row (let's call it the top row) by dividing each element with the
-pivot element, and then we subtract each underlying row with their respective pivot elements multiplied
-by the top row. By the end of the first outmost loop, we end up with a matrix that has a computed top row,
-and thus its pivot element being a one and all the elements below the pivot being zeros. Then successively
-after each row gets computed, we will end up with our result matrix.
+The algorithm for the Gauss elimination iterates through the matrix in several different loops.
+The outermost loop iterates along the main diagonal (i.e. the {\it pivot elements}) of the matrix.
+In each loop, we do the two following operations; we minimize the current row (let's call it the
+top row) by dividing each element with the pivot element, and then we subtract each underlying row
+with their respective pivot elements multiplied by the top row. By the end of the first outmost loop,
+we end up with a matrix that has a computed top row, and thus its pivot element being a one and all
+the elements below the pivot being zeros. Then successively after each row gets computed, we will end
+up with our result matrix.
 
 The first approach for writing the program was to directly translate an elimination algorithm written
 in C-code to Assembler, and not bother with any optimizations. After confirming that we had a working
@@ -91,7 +87,7 @@ necessary instructions, and make sure that values used often only got calculated
 it would be very important to make sure that  all instructions, that were contained in the outermost loop, could
 fit inside the {\it Instruction Cache} memory unit (I-Cache). If we only could reduce the instructions
 to fit in the cache, we would almost exclusively get a 100\% {\it hit rate}. High hit rates
-greatly  improve performance by only wasting relatively few clock cycles for fetching instructions from the
+greatly improve performance by only wasting relatively few clock cycles for fetching instructions from the
 main memory.
 
 To achieve this goal of going under the limit, we had to often think of ways to execute one function of the
@@ -111,119 +107,87 @@ resulting in the program having to wait for the memory to finish. By reducing th
 execute faster, we also brought the read- and write-instructions closer. This created a bottleneck, which outweighed
 the possible performance boost that we would get. For that reason we left out some optimization opportunities in
 favour for an optimal hardware configuration. But what was our optimal configuration? That is what we will discuss in
-the next chapter.
+the next section.
 
 \subsection{Hardware}
 When we were choosing the components we had to consider several things. Since the goal of this project was to get the best
-performance for as cheap as possible, we could not simply try to get the fastest execution time possible. With this in mind,
+performance as cheap as possible, we could not simply try to get the fastest execution time possible. With this in mind,
 we tested several different configurations. In the following subsections we describe our thought process when deciding
 which hardware configuration to use.
 
+\subsubsection{Data Cache}
+With the D-Cache, we had to hit a balance between price and performance. Larger cache gives better execution times, 
+since there is such a large amount of memory accesses, but the price increase is steeper than the performance increase.
+Therefore we had to find a point when the price would drain the possible performance gain that we would get. The main
+cost for the caches are prices for larger ones, so we had to find other ways to improve performance than just having
+a large cache. Associativity is a great hardware implementation that makes the miss rate drop down greatly, but unfortunately
+at the cost of slower CPU clock speed. Nevertheless, a 2-way associativity of the D-Cache has been proven to be the 
+best configuration. As for block sizes, we would want to keep as much recent data in the cache for as long as possible, while
+consulting the main memory as little as possible. In other words, we want to find a good balance between the {\it temporal
+locality and spatial locality} usage. 
+
+\subsubsection{Instruction Cache}
+The I-Cache only has to be as big as the largest loop in the program, or the longest streak of different instructions. 
+Since our program managed to compress the largest loop down to under 32 instructions, a 32-word I-Cache will suffice.
+A larger cache would be pointless, since price would go up and performance in terms of CPU clock frequency would go down.
+Additionally, a direct-mapped associativity is the best choice, since we have already such a high hit rate, and a higher
+associativity would also slow down the clock frequency.
+
+Finally, we wanted the block size of the cache to be as large as possible. Large blocks exploit the spatial locality
+of the memory and end up with fewer cache misses. However, our code needed to change in order to adopt to the large block size.
+Consider this, if we are in the first iteration of the outermost loop of our program, when we would get near the end, we
+might store some instructions outside the loop, that are only necessary at the end of the program. This would mean that
+the {\it Least Recently Used} (LRU) replacement policy of the cache would replace the early instructions of the loop with the instructions
+outside. Then each time the program gets to the end, we would get a read miss, and we'd start over again. This is not good,
+since it will generate unnecessary cache misses. The solution would either be to change to another block size, or to pad
+the program with NOP-instructions, to synchronize the cache writes better. That's what we did, and we ended up with fewer
+cache misses, for the same price of a same size cache with smaller blocks.
+
 \subsubsection{Memory}
-Since the entire 24x24 matrix is stored in memory we have to read memory every time we need a new value from the matrix,
-and write to memory every time we want to update a value in the matrix. This adds up to a lot of memory accesses, so a 
+The main memory will have all the instructions and data stored for the program to access during its execution time. Since the
+program is calculating a matrix with hundreds of elements, we'd want a fast memory. The entire 24x24 matrix is stored in
+the main memory, so we have to read the memory every time we need a new value from the matrix. The same way we have to write
+back to the memory every time we want to update a value in the matrix. This adds up to a lot of memory accesses, so a 
 fast memory is going to greatly improve the execution time. 
 
-\subsubsection{I-Cache}
-There are not many instructions in the loops in our program. A large I-Cache is not necessary to store the instructions of each loop
-while it is running, which means that a larger cache is not going to be a big enough performance increase to make the price increase
-worth it.
-
-\subsubsection{D-Cache}
-We had to hit a balance between price and performance here. Larger cache gives better execution times, 
-since there is such a large amount of memory accesses, but the price increase is steeper than the performance increase. 
-
+The memory can also support a write buffer, which is beneficial when writing a lot of data in a short period of time.
+However, we can't max it out with a giant buffer; we need to have a good flow of data. This is due to the fact that first time
+accesses in one write session is longer than subsequent accesses. For this reason we want to have the buffer busy almost
+all the time, i.e. increase the {\it utilization} as much as possible, so that the shorter access time is being exploited.
+The sweet spot for our program landed at a size of 4 words, presumably because of the data cache block size being 4 words, where
+most of the writing occurs. Each time a write miss occurs in the D-Cache, 4 subsequent data words in memory will be written back.
 
 \subsection{Results}
-Här lägger vi in alla testresultat och visar vilken som är bäst etc.
-
-After trying a lot of different configuration, this was the best one we could find:
+The final form of the system consist of one CPU, one main memory and two caches. The I-Cache has a
+size of 32 words, with 8-word blocks and a direct-mapped associativity. The D-Cache is configured with a larger 64
+word data space, with the smaller 4-word blocks and a 2-way associativity. Both caches implement the LRU replacement
+policy. The main memory has a first access time of 30 ns, with subsequent accesses of 6 ns. The memory also has a
+write buffer of 4 words, to accommodate for the frequent data writes. All specifications are listed in Table~\ref{specs}.
 
 \begin{table}
-\begin{tabular}{l|l|l|}
-{\bf Configuration} \\ \hline
-I-Cache size(words) & 32 \\ \hline
-I-Cache associativity & 1 \\ \hline
-I-Cache block size(words) & 4 \\ \hline
-D-Cache size(words) & 64 \\ \hline
-D-Cache associativity & 2 \\ \hline
-D-Cache block size(words) & 4 \\ \hline
-Processor frequency(MHz) & 450 \\ \hline
-Memory access time(ns, first/other) &  30 / 6\\ \hline
-Write buffer Size(words) & 4 \\ \hline
-{\bf Results} & \\ \hline
-Clock cycles & 140 314 \\ \hline
-Execution time(\mu s) & 311.809 \\ \hline
-Total component cost & 3.37 \\ \hline
-Price x performance(\mu sC\$) & 1050.796\\ \hline
-\end{tabular}
+	\center
+	\large
+	\def\arraystretch{1.2} 
+	\begin{tabular}{|l|l|}
+		\hline
+		\multicolumn{2}{|c|}{\bf Configuration} 						\\ \hline
+		I-Cache size							& 32 words 				\\ 
+		I-Cache associativity 					& Direct-mapped			\\ 
+		I-Cache block size		 				& 8 words				\\ \hline
+		D-Cache size 		 					& 64 words				\\ 
+		D-Cache associativity 					& 2-way					\\ 
+		D-Cache block size 		 				& 4 words				\\ \hline
+		Processor frequency		 				& 450 MHz				\\ \hline
+		Memory access time (first / others) 	& 30 ns / 6 ns			\\ 
+		Write buffer Size 		 				& 4 words				\\ \hline
+		\multicolumn{2}{|c|}{\bf Results} 								\\ \hline
+		Clock cycles 							& 132 100 				\\ 
+		Execution time		 					& 293.556 $ \mu s $ 	\\ 
+		Total component cost 					& 3.37 $ C\$ $			\\ 
+		Price $ \times $ performance			& 989.282 $ \mu sC\$ $	\\ \hline
+	\end{tabular}
+	\label{specs}
+	\caption{A compilation of the system's specifications.}
 \end{table}
 
-
-
-
-
-
-
-
-
-\begin{table}   
-\centering
-\scriptsize
-\def\arraystretch{1.1}              
-\begin{tabularx}{14cm}{X|cccccc|cccccc}
-              & \multicolumn{6}{c|}{\bf Gothenburg}                                   & \multicolumn{6}{c}{\bf Stockholm}                                    \\ \hline
-{\bf Year}    & {\bf Jan} & {\bf Feb} & {\bf Mar} & {\bf Apr} & {\bf May} & {\bf Jun} & {\bf Jan} & {\bf Feb} & {\bf Mar} & {\bf Apr} & {\bf May} & {\bf Jun} \\ \hline
-{\bf 2002}    & 153       & 95        & 48        & 27        & 71        & 116       & 65        & 42        & 28        & 8         & 34        & 94        \\
-{\bf 2003}    & 71        & 34        & 21        & 96        & 77        & 64        & 19        & 21        & 2         & 44        & 58        & 44        \\
-{\bf 2004}    & 65        & 38        & 61        & 36        & 27        & 83        & 37        & 29        & 25        & 13        & 47        & 108       \\
-{\bf 2005}    & 126       & 43        & 41        & 25        & 39        & 73        & 44        & 38        & 14        & 11        & 56        & 72        \\
-{\bf 2006}    & 66        & 41        & 52        & 94        & 71        & 42        & 10        & 29        & 28        & 28        & 46        & 32        \\
-{\bf 2007}    & 159       & 28        & 81        & 40        & 57        & 130       & 73        & 26        & 19        & 17        & 25        & 67        \\
-{\bf 2008}    & 166       & 89        & 108       & 33        & 11        & 67        & 69        & 23        & 41        & 28        & 17        & 56        \\
-{\bf 2009}    & 57        & 31        & 48        & 11        & 80        & 58        & 21        & 24        & 36        & 5         & 25        & 80        \\
-{\bf 2010}    & 30        & 48        & 46        & 32        & 31        & 53        & 26        & 29        & 22        & 23        & 31        & 33        \\
-{\bf 2011}    & 72        & 65        & 40        & 34        & 67        & 58        & 33        & 38        & 11        & 10        & 34        & 57        \\
-{\bf 2012}    & 88        & 55        & 9         & 75        & 74        & 95        & 42        & 45        & 18        & 62        & 20        & 160       \\
-{\bf 2013}    & 44        & 17        & 3         & 46        & 73        & 139       & 29        & 30        & 3         & 27        & 17        & 46        \\
-{\bf 2014}    & 66        & 107       & 32        & 47        & 81        & 52        & 39        & 35        & 43        & 25        & 35        & 28        \\ \hline
-{\bf Average} & 89        & 53        & 45        & 46        & 58        & 79        & 39        & 31        & 22        & 23        & 34        & 67        \\ \hline
-{\bf Normal value \newline
-(1961-1990)}  & 61        & 40        & 49        & 41        & 49        & 59        & 39        & 27        & 26        & 30        & 30        & 45 \\
-\end{tabularx}
-\vspace{0.5cm}
-
-\begin{tabularx}{14cm}{X|cccccc|cccccc}
-{\bf Year}    & {\bf Jul} & {\bf Aug} & {\bf Sep} & {\bf Oct} & {\bf Nov} & {\bf Dec} & {\bf Jul} & {\bf Aug} & {\bf Sep} & {\bf Oct} & {\bf Nov} & {\bf Dec} \\ \hline
-{\bf 2002}    & 101       & 35        & 17        & 86        & 82        & 16        & 114       & 4         & 13        & 45        & 32        & 9         \\
-{\bf 2003}    & 143       & 32        & 25        & 101       & 76        & 119       & 75        & 53        & 20        & 32        & 43        & 78        \\
-{\bf 2004}    & 98        & 128       & 100       & 115       & 82        & 76        & 55        & 49        & 39        & 45        & 47        & 40        \\
-{\bf 2005}    & 107       & 83        & 60        & 75        & 93        & 53        & 122       & 65        & 11        & 28        & 44        & 54        \\
-{\bf 2006}    & 78        & 190       & 55        & 202       & 179       & 193       & 33        & 146       & 23        & 98        & 43        & 34        \\
-{\bf 2007}    & 129       & 56        & 121       & 47        & 82        & 108       & 51        & 17        & 74        & 39        & 48        & 45        \\
-{\bf 2008}    & 57        & 167       & 81        & 142       & 100       & 37        & 42        & 154       & 27        & 64        & 63        & 50        \\
-{\bf 2009}    & 170       & 79        & 56        & 84        & 128       & 53        & 89        & 54        & 32        & 68        & 52        & 45        \\ 
-{\bf 2010}    & 159       & 118       & 74        & 130       & 80        & 48        & 74        & 105       & 73        & 34        & 58        & 45        \\
-{\bf 2011}    & 121       & 156       & 129       & 107       & 39        & 146       & 13        & 90        & 60        & 44        & 14        & 75        \\
-{\bf 2012}    & 97        & 88        & 146       & 146       & 92        & 78        & 61        & 121       & 58        & 72        & 56        & 66        \\
-{\bf 2013}    & 51        & 49        & 56        & 106       & 72        & 154       & 43        & 55        & 39        & 58        & 61        & 51        \\
-{\bf 2014}    & 39        & 142       & 36        &           &           &           & 44        & 115       & 83        &           &           &           \\ \hline
-{\bf Average} & 104       & 102       & 74        & 103       & 85        & 83        & 63        & 79        & 42        & 48        & 43        & 46        \\ \hline
-{\bf Normal value \newline
-(1961-1990)}  & 68        & 75        & 80       & 83         & 82        & 72        & 72        & 66        & 55        & 50        & 53        & 46        \\
-\end{tabularx}
-\caption{Precipitation, mm/month}
-\label{tab:gbg/sthlm}
-\end{table}
-
-
-\begin{thebibliography}{3}
-\bibitem{smhi}     Monthly observations of precipitation 2002-2014, SMHI.                                \\
-                   \url{http://data.smhi.se/met/climate/time_series/month/vov_pdf/}, \mbox{visited} 2014-10-12.
-\bibitem{wmo}      Climate Data and Data Related Products, WMO.                                                     \\
-                   \url{http://www.wmo.int/pages/themes/climate/climate_data_and_products.php}, \mbox{visited} 2014-10-11.
-\bibitem{critical} Student t-Value Calculator, Dr. Daniel Soper, 2014.                                      \\
-                   \url{http://www.danielsoper.com/statcalc3/calc.aspx?id=10},
-                   \mbox{visited} 2014-10-12.
-\end{thebibliography}
 \end{document}

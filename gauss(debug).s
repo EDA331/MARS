@@ -1,20 +1,32 @@
+#### Chalmers Tekniska Högskola
+#### EDA331 - Datorsystemteknik
+####
+#### Grupp DST15_035
+#### Dennis Bennhage,	bennhage@student.chalmers.se
+#### Hampus Lidin, 	lidin@student.chalmers.se
+#### 19:e maj 2015
+#
+# I-Cache:	Direct mapped, 32 word, 4 blocks (8-word blocks), LRU replacement policy.
+# D-Cache: 	2-way, 64 word, 8 blocks (8-word blocks), LRU replacement policy.
+# CPU:		450 MHz.
+# Memory:	30 cycles first time access, 6 cycles succeeding access, 8-word write buffer.
+# Evaluation:	Price 3.49 C$, execution time 268.729 µs, total component cost 937.864 µsC$.
+		
 ### Text segment
 		.text
 start:
 		la	$a0, matrix_24x24		# a0 = A (base address of matrix)
-		li	$a1, 24    		    # a1 = N (number of elements per row)
-									# <debug>
-#		jal 	print_matrix	    # print matrix before elimination
-		nop							# </debug>
-		jal 	eliminate			# triangularize matrix!
-		nop							# <debug>
-#		jal 	print_matrix		# print matrix after elimination
-		nop							# </debug>
+		jal 	print_matrix	   		# Print matrix before elimination
+		addiu	$a1, $0, 24    			# a1 = N (number of elements per row)
+ 		jal 	eliminate			# Triangularize matrix
+		nop					# Delay slot
+		jal 	print_matrix			# Print matrix after elimination
+ 		nop					# Delay slot
 		jal 	exit
 
 exit:
-		li   	$v0, 10          	# specify exit system call
-      	syscall						# exit program
+		li   	$v0, 10          		# specify exit system call
+     	 	syscall					# exit program
 
 ################################################################################
 # eliminate - Triangularize matrix.
@@ -23,119 +35,64 @@ exit:
 #		$a1  - number of elements per row (N)
 
 eliminate:
-		# If necessary, create stack frame, and save return address from ra
-		addiu	$sp, $sp, -16			# allocate stack frame
-		sw	$s2, 12($sp)			# int k
-		sw	$s1, 8($sp)			# int j
-		sw	$s0, 4($sp)			# int i 	
-		sw	$ra, 0($sp)			# done saving registers
-		addiu	$s2, $0, 0			# k = 0
+		nop					# Padding to synchronize I-Cache
+		nop					# Padding to synchronize I-Cache
+		nop					# Padding to synchronize I-Cache
+		addiu	$sp, $sp, -8			# Allocate stack frame
+		sw	$s1, 4($sp)			# var1
+		sw	$s0, 0($sp)			# var0, done saving registers
+		lwc1	$f5, zero			# f5 = 0.0
+		lwc1	$f6, one			# f6 = 1.0
+		sll	$t7, $a1, 2			# t7 = N*4
+		addiu	$t6, $t7, -4			# t6 = N*4 - 4 = Width - 1 (this decreases by one word each 'pivots'-loop)
+		addiu	$t5, $t7, 4			# t5 = N*4 + 4
+		multu	$t7, $a1 			# N*N*4
+		mflo	$s0 				# var0 = N*N*4
+		addu	$s0, $s0, $a0 			# var0 = &A[N][0]
+		addu	$s1, $0, $a0			# var1 = &A[k][k]
 pivots:			
-		sll	$t1, $s2, 2			# t1 = k*4
-		multu	$a1, $t1			# N*4*k
-		mflo	$t0				# t0 = N*4*k
-		addu	$t0, $t0, $a0			# t0 = &A[k][0]
-		addu	$t1, $t1, $t0			# t1 = &A[k][k]
-		
-		addiu	$s1, $s2, 1			# j = k + 1 
+		addu	$t0, $0, $s1			# t0 = &A[k][k]
+		addu	$t4, $t6, $s1			# t4 = &A[k][N-1]	
+		lwc1	$f0, 0($t0)			# f0 = A[k][k]
+		beq 	$t0, $t4, pivot_row_end		# If &A[k][k] == &A[k][N-1], then exit
+		swc1	$f6, 0($t0)			# A[k][k] = 1.0
 pivot_row:
-		beq 	$s1, $a1, pivot_row_end		# If j == N, then exit
-		
-		nop					# To avoid branch hazard
-		sll   	$t2, $s1, 2 			# t2 = j*4
-		addu	$t2, $t2, $t0			# t2 = &A[k][j]
-		lwc1	$f1, 0($t1)			# f1 = A[k][k]
-		lwc1	$f0, 0($t2)			# f0 = A[k][j]
-		addiu	$s1, $s1, 1			# j++
-		div.s	$f0, $f0, $f1			# f0 = A[k][j] / A[k][k]
-		
-		b	pivot_row			# Branch to next iteration
-		swc1	$f0, 0($t2) 			# A[k][j] = f0
-		
+		lwc1	$f1, 4($t0)			# f1 = A[k][j]
+		addiu	$t0, $t0, 4			# t0 = t0 + 4 (squeezed in to avoid load-use hazard)
+		div.s	$f1, $f1, $f0			# f1 = A[k][j] / A[k][k]
+		bne	$t0, $t4, pivot_row		# If &A[k][k] != &A[k][N-1], then branch to next iteration
+		swc1	$f1, 0($t0) 			# A[k][j] = f1 (jumped to next index previously)
 pivot_row_end:	
-		lwc1 	$f0, one			# t0 = 1.0
-		addiu 	$s0, $s2, 1			# i = k + 1
-		swc1	$f0, 0($t1)			# A[k][k] = 1.0
+		addu	$t1, $s1, $t7			# t1 = &A[i][k]
 pivot_mat_row:
-		beq 	$s0, $a1, pivot_mat_row_end	# If i == N, then exit
-		
-		sll	$t1, $a1, 2			# t1 = N*4
-		multu	$t1, $s0			# N*4*i
-		mflo	$t1				# t1 = N*4*i
-		addiu	$s1, $s2, 1			# j = k + 1
-		addu	$t1, $t1, $a0			# t1 = N*4*i + &A = &A[i][0]
+		slt 	$t0, $t1, $s0			# If &A[i][k] < &A[N][0], then t0 = 1, else t0 = 0
+		addu	$t2, $0, $s1			# t2 = &A[k][k] (squeezed in to avoid branch hazard)
+		beq 	$t0, $0, pivot_mat_row_end	# If t0 = 0, then exit
+		addu  	$t3, $0, $t1			# t3 = &A[i][k]
+		lwc1	$f0, 0($t3)			# f0 = A[i][k]
+		beq 	$t2, $t4, pivot_mat_col_end	# If &A[k][k] == &A[k][N-1], then exit
+		swc1	$f5, 0($t3)			# A[i][k] = 0.0
 pivot_mat_col:
-		beq 	$s1, $a1, pivot_mat_col_end	# If j == N, then exit
-		
-		sll	$t5, $s1, 2			# t5 = j*4
-		sll	$t6, $s2, 2			# t5 = k*4 
-		addu	$t2, $t0, $t5			# t2 = &A[k][j]
-		addu	$t3, $t1, $t5			# t3 = &A[i][j]
-		addu  	$t4, $t1, $t6			# t4 = &A[i][k]
-		lwc1	$f0, 0($t2)			# f0 = A[k][j]
-		lwc1	$f1, 0($t3)			# f1 = A[i][j]
-		lwc1	$f2, 0($t4)			# f2 = A[i][k]
-		
-		addiu	$s1, $s1, 1			# j++
-		
-		mul.s	$f0, $f2, $f0			# f0 = A[i][k]*A[k][j]
-		sub.s	$f0, $f1, $f0			# f0 = A[i][j] - A[i][k]*A[k][j]
-		
-		b	pivot_mat_col			# Branch to next iteration
-		swc1	$f0, 0($t3)			# A[i][j] = f0
+		lwc1	$f1, 4($t2)			# f1 = A[k][j]
+		lwc1	$f2, 4($t3)			# f2 = A[i][j]
+		addiu	$t2, $t2, 4			# t2 = t2 + 4
+		mul.s	$f1, $f0, $f1			# f1 = A[i][k]*A[k][j]
+		sub.s	$f2, $f2, $f1			# f2 = A[i][j] - A[i][k]*A[k][j]
+		swc1	$f2, 4($t3)			# A[i][j] = f2
+		bne	$t2, $t4, pivot_mat_col		# If &A[k][k] != &A[k][N-1], then branch to next iteration
+		addiu	$t3, $t3, 4			# t3 = t3 + 4
 pivot_mat_col_end:
-		lwc1	$f0, zero			# f0 = 0.0
-		addiu	$s0, $s0, 1			# j++
 		b	pivot_mat_row			# Branch to next iteration
-		swc1	$f0, 0($t4)			# A[i][k] = 0.0
+		addu	$t1, $t1, $t7			# t1 = t1 + N*4
 pivot_mat_row_end:
-		addiu	$s2, $s2, 1			# k++
-		bne	$s2, $a1, pivots		# k != N
-		nop
+		addu	$s1, $s1, $t5			# s1 = s1 + N*4 + 4
+		bne	$t6, $0, pivots			# If the "width-1"-variable has decreased to 0, then branch to next iteration
+		addiu	$t6, $t6, -4			# t6 = t6 - 4
 pivots_end:
-		lw	$ra, 0($sp)			
-		lw 	$s0, 4($sp)
-		lw 	$s1, 8($sp)
-		lw 	$s2, 12($sp)			# done restoring registers
-		
-		addiu	$sp, $sp, 16			# remove stack frame
-
-		jr		$ra			# return from subroutine
-		nop					# this is the delay slot associated with all types of jumps
-
-################################################################################
-# getelem - Get address and content of matrix element A[a][b].
-#
-# Argument registers $a0..$a3 are preserved across calls
-#
-# Args:		$a0  - base address of matrix (A)
-#		$a1  - number of elements per row (N)
-#		$a2  - row number (a)
-#		$a3  - column number (b)
-#						
-# Returns:	$v0  - Address to A[a][b]
-#		$f0  - Contents of A[a][b] (single precision)
-getelem:
-		addiu	$sp, $sp, -12		# allocate stack frame
-		sw	$s2, 8($sp)
-		sw	$s1, 4($sp)
-		sw	$s0, 0($sp)		# done saving registers
-		
-		sll	$s2, $a1, 2		# s2 = 4*N (number of bytes per row)
-		multu	$a2, $s2		# result will be 32-bit unless the matrix is huge
-		mflo	$s1			# s1 = a*s2
-		addu	$s1, $s1, $a0		# Now s1 contains address to row a
-		sll	$s0, $a3, 2		# s0 = 4*b (byte offset of column b)
-		addu	$v0, $s1, $s0		# Now we have address to A[a][b] in v0...
-		l.s	$f0, 0($v0)		# ... and contents of A[a][b] in f0.
-		
-		lw	$s2, 8($sp)
-		lw	$s1, 4($sp)
-		lw	$s0, 0($sp)		# done restoring registers
-		addiu	$sp, $sp, 12		# remove stack frame
-		
-		jr	$ra			# return from subroutine
-		nop				# this is the delay slot associated with all types of jumps
+		lw 	$s0, 0($sp)
+		lw 	$s1, 4($sp)			# Done restoring registers
+		jr	$ra				# Return from subroutine
+		addiu	$sp, $sp, 8			# Remove stack frame
 
 ################################################################################
 # print_matrix
@@ -147,49 +104,49 @@ getelem:
 # the value of $f12 is _not_ preserved across calls.
 #
 # Args:		$a0  - base address of matrix (A)
-#			$a1  - number of elements per row (N) 
+#		$a1  - number of elements per row (N) 
 print_matrix:
-		addiu	$sp,  $sp, -20		# allocate stack frame
-		sw		$ra,  16($sp)
-		sw      $s2,  12($sp)
-		sw		$s1,  8($sp)
-		sw		$s0,  4($sp) 
-		sw		$a0,  0($sp)		# done saving registers
+		addiu	$sp, $sp, -20			# Allocate stack frame
+		sw	$ra, 16($sp)
+		sw      $s2, 12($sp)
+		sw	$s1, 8($sp)
+		sw	$s0, 4($sp) 
+		sw	$a0, 0($sp)			# Done saving registers
 
 		move	$s2,  $a0			# s2 = a0 (array pointer)
 		move	$s1,  $zero			# s1 = 0  (row index)
 loop_s1:
 		move	$s0,  $zero			# s0 = 0  (column index)
 loop_s0:
-		l.s		$f12, 0($s2)        # $f12 = A[s1][s0]
-		li		$v0,  2				# specify print float system call
- 		syscall						# print A[s1][s0]
-		la		$a0,  spaces
-		li		$v0,  4				# specify print string system call
-		syscall						# print spaces
+		l.s	$f12, 0($s2)       		# $f12 = A[s1][s0]
+		li	$v0,  2				# Specify print float system call
+ 		syscall					# Print A[s1][s0]
+		la	$a0,  spaces
+		li	$v0,  4				# Specify print string system call
+		syscall					# Print spaces
 
-		addiu	$s2,  $s2, 4		# increment pointer by 4
+		addiu	$s2,  $s2, 4			# Increment pointer by 4
 
-		addiu	$s0,  $s0, 1        # increment s0
-		blt		$s0,  $a1, loop_s0  # loop while s0 < a1
+		addiu	$s0,  $s0, 1       		# Increment s0
+		blt	$s0,  $a1, loop_s0 		# Loop while s0 < a1
 		nop
-		la		$a0,  newline
-		syscall						# print newline
-		addiu	$s1,  $s1, 1		# increment s1
-		blt		$s1,  $a1, loop_s1  # loop while s1 < a1
+		la	$a0,  newline
+		syscall					# Print newline
+		addiu	$s1,  $s1, 1			# Increment s1
+		blt	$s1,  $a1, loop_s1  		# Loop while s1 < a1
 		nop
-		la		$a0,  newline
-		syscall						# print newline
+		la	$a0,  newline
+		syscall					# Print newline
 
-		lw		$ra,  16($sp)
-		lw		$s2,  12($sp)
-		lw		$s1,  8($sp)
-		lw		$s0,  4($sp)
-		lw		$a0,  0($sp)		# done restoring registers
-		addiu	$sp,  $sp, 20		# remove stack frame
+		lw	$ra,  16($sp)
+		lw	$s2,  12($sp)
+		lw	$s1,  8($sp)
+		lw	$s0,  4($sp)
+		lw	$a0,  0($sp)			# Done restoring registers
+		addiu	$sp,  $sp, 20			# Remove stack frame
 
-		jr		$ra					# return from subroutine
-		nop							# this is the delay slot associated with all types of jumps
+		jr	$ra				# Return from subroutine
+		nop					# This is the delay slot associated with all types of jumps
 
 ### End of text segment
 
@@ -198,9 +155,9 @@ loop_s0:
 		
 ### String constants
 spaces:
-		.asciiz "   "   			# spaces to insert between numbers
+		.asciiz "   "   			# Spaces to insert between numbers
 newline:
-		.asciiz "\n"  				# newline
+		.asciiz "\n"  				# New line
 
 ## Floating point numbers ##
 zero:
@@ -208,7 +165,7 @@ zero:
 one:
 		.float 1.0
 
-## Input matrix: (4x4) ##
+# Input matrix: (4x4) ##
 matrix_4x4:	
 		.float 57.0
 		.float 20.0

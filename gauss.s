@@ -1,29 +1,24 @@
-#### Chalmers Tekniska HÃ¶gskola
+#### Chalmers Tekniska Högskola
 #### EDA331 - Datorsystemteknik
 ####
 #### Grupp DST15_035
 #### Dennis Bennhage,	bennhage@student.chalmers.se
 #### Hampus Lidin, 	lidin@student.chalmers.se
-#### 17:e maj 2015
+#### 19:e maj 2015
 #
-# I-Cache:	Direct mapped, 128 bytes, 8 blocks (16-byte blocks), LRU replacement policy.
-# D-Cache: 	2-way, 256 bytes, 16 blocks (16-byte blocks), LRU replacement policy.
+# I-Cache:	Direct mapped, 32 word, 4 blocks (8-word blocks), LRU replacement policy.
+# D-Cache: 	2-way, 64 word, 8 blocks (8-word blocks), LRU replacement policy.
 # CPU:		450 MHz.
-# Memory:	30 cycles first time access, 6 cycles succeeding access, 16-byte write buffer.
-# Evaluation:	Price 3.37 C$, execution time 293.709 Âµs, total component cost 989.799 ÂµsC$.
+# Memory:	30 cycles first time access, 6 cycles succeeding access, 8-word write buffer.
+# Evaluation:	Price 3.49 C$, execution time 268.729 µs, total component cost 937.864 µsC$.
 		
 ### Text segment
 		.text
 start:
 		la	$a0, matrix_24x24		# a0 = A (base address of matrix)
-#		jal 	print_matrix	   		# Print matrix before elimination
-#		nop					# Delay slot
-		jal 	eliminate			# Triangularize matrix
+ 		jal 	eliminate			# Triangularize matrix
 		addiu	$a1, $0, 24    			# a1 = N (number of elements per row)
-# 		jal 	print_matrix			# Print matrix after elimination
-#		nop					# Delay slot
 		jal 	exit
-
 exit:
 		li   	$v0, 10          		# specify exit system call
      	 	syscall					# exit program
@@ -94,70 +89,10 @@ pivots_end:
 		jr	$ra				# Return from subroutine
 		addiu	$sp, $sp, 8			# Remove stack frame
 
-################################################################################
-# print_matrix
-#
-# This routine is for debugging purposes only. 
-# Do not call this routine when timing your code!
-#
-# print_matrix uses floating point register $f12.
-# the value of $f12 is _not_ preserved across calls.
-#
-# Args:		$a0  - base address of matrix (A)
-#		$a1  - number of elements per row (N) 
-print_matrix:
-		addiu	$sp, $sp, -20			# Allocate stack frame
-		sw	$ra, 16($sp)
-		sw      $s2, 12($sp)
-		sw	$s1, 8($sp)
-		sw	$s0, 4($sp) 
-		sw	$a0, 0($sp)			# Done saving registers
-
-		move	$s2,  $a0			# s2 = a0 (array pointer)
-		move	$s1,  $zero			# s1 = 0  (row index)
-loop_s1:
-		move	$s0,  $zero			# s0 = 0  (column index)
-loop_s0:
-		l.s	$f12, 0($s2)       		# $f12 = A[s1][s0]
-		li	$v0,  2				# Specify print float system call
- 		syscall					# Print A[s1][s0]
-		la	$a0,  spaces
-		li	$v0,  4				# Specify print string system call
-		syscall					# Print spaces
-
-		addiu	$s2,  $s2, 4			# Increment pointer by 4
-
-		addiu	$s0,  $s0, 1       		# Increment s0
-		blt	$s0,  $a1, loop_s0 		# Loop while s0 < a1
-		nop
-		la	$a0,  newline
-		syscall					# Print newline
-		addiu	$s1,  $s1, 1			# Increment s1
-		blt	$s1,  $a1, loop_s1  		# Loop while s1 < a1
-		nop
-		la	$a0,  newline
-		syscall					# Print newline
-
-		lw	$ra,  16($sp)
-		lw	$s2,  12($sp)
-		lw	$s1,  8($sp)
-		lw	$s0,  4($sp)
-		lw	$a0,  0($sp)			# Done restoring registers
-		addiu	$sp,  $sp, 20			# Remove stack frame
-
-		jr	$ra				# Return from subroutine
-		nop					# This is the delay slot associated with all types of jumps
-
 ### End of text segment
 
 ### Data segment 
 		.data
-		
-### String constants
-spaces:
-		.asciiz "   "   			# Spaces to insert between numbers
-newline:
-		.asciiz "\n"  				# New line
 
 ## Floating point numbers ##
 zero:
@@ -165,38 +100,13 @@ zero:
 one:
 		.float 1.0
 
-## Input matrix: (4x4) ##
-matrix_4x4:	
-		.float 57.0
-		.float 20.0
-		.float 34.0
-		.float 59.0
-		
-		.float 104.0
-		.float 19.0
-		.float 77.0
-		.float 25.0
-		
-		.float 55.0
-		.float 14.0
-		.float 10.0
-		.float 43.0
-		
-		.float 31.0
-		.float 41.0
-		.float 108.0
-		.float 59.0
-		
-		# These make it easy to check if 
-		# data outside the matrix is overwritten
-		.word 0xdeadbeef
-		.word 0xdeadbeef
-		.word 0xdeadbeef
-		.word 0xdeadbeef
-		.word 0xdeadbeef
-		.word 0xdeadbeef
-		.word 0xdeadbeef
-		.word 0xdeadbeef
+## Padding memory
+		.float 0.0		
+		.float 0.0
+		.float 0.0
+		.float 0.0
+		.float 0.0
+		.float 0.0
 
 ## Input matrix: (24x24) ##
 matrix_24x24:

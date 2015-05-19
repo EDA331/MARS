@@ -6,8 +6,8 @@
 #### Hampus Lidin, 	lidin@student.chalmers.se
 #### 17:e maj 2015
 #
-# I-Cache:	Direct mapped, 128 bytes, 8 blocks (16-byte blocks), LRU replacement policy.
-# D-Cache: 	2-way, 256 bytes, 16 blocks (16-byte blocks), LRU replacement policy.
+# I-Cache:	Direct mapped, 32 words, 4 blocks (8-word blocks), LRU replacement policy.
+# D-Cache: 	2-way, 64 words, 16 blocks (4-word blocks), LRU replacement policy.
 # CPU:		450 MHz.
 # Memory:	30 cycles first time access, 6 cycles succeeding access, 16-byte write buffer.
 # Evaluation:	Price 3.37 C$, execution time 293.709 µs, total component cost 989.799 µsC$.

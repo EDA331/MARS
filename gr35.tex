@@ -2,6 +2,7 @@
 
 \usepackage{mathtools}
 \usepackage{enumerate}
+\usepackage{multirow}
 \usepackage[retainorgcmds]{IEEEtrantools}
 \usepackage{pgf}
 \usepackage{hyperref}
@@ -22,7 +23,7 @@ Home Assignment, DST15\_035\\
 {\large Dennis Bennhage \& Hampus Lidin}\\
 \vspace{10cm}
 %
-May 17th, 2015
+May 21st, 2015
 }
 
 \date{}
@@ -36,7 +37,7 @@ May 17th, 2015
 \section{System Overview}
 The system we have constructed is intended to perform the first step in {\it Gauss elimination}
 on any square matrix, while it has been specifically optimized for any 24x24 square matrix.
-It is optimized to yield the most efficient execution, whilst keeping the price as low as
+It is optimized to yield the most efficient execution, while keeping the price as low as
 possible. Therefore the performance has often been compromised in favour of cheaper components.
 
 The program is running on a 5-stage pipelined, word (4-byte) addressable MIPS CPU. The program will
@@ -52,29 +53,29 @@ also see that the software has to adjust for the hardware component costs someti
 
 \subsection{Software}
 The algorithm for the Gauss elimination iterates through the matrix in several different loops.
-The outermost loop iterates along the main diagonal (i.e. the {\it pivot elements}) of the matrix.
+The outmost loop iterates along the main diagonal (i.e. the {\it pivot elements}) of the matrix.
 In each loop, we do the two following operations; we minimize the current row (let's call it the
 top row) by dividing each element with the pivot element, and then we subtract each underlying row
-with their respective pivot elements multiplied by the top row. By the end of the first outmost loop,
-we end up with a matrix that has a computed top row, and thus its pivot element being a one and all
-the elements below the pivot being zeros. Then successively after each row gets computed, we will end
-up with our result matrix.
+by their respective pivot elements multiplied to the top row. By the end of the first outmost
+loop-iteration, we end up with a matrix that has a computed top row, and thus its pivot element being
+a one and all the elements below the pivot being zeros. Then successively after each row gets computed,
+we will end up with our result matrix.
 
 The first approach for writing the program was to directly translate an elimination algorithm written
 in C-code to Assembler, and not bother with any optimizations. After confirming that we had a working
 program, we started to find places in the code where we could do something to speed up the 
 performance. We realized that since we had many loops in our program, we'd want to push out or 
 eliminate as many instructions from the loops as possible. One way we had done this, was to convert the 
-arrays into pointers instead. With arrays, you have to calculate each new address for every iteration of the 
+arrays into pointers. With arrays, you have to calculate each new address for every iteration of the 
 loop. This will increase the number of instructions executed in each loop (the {\it overhead}). When using
 deep-nested loops as we do in our algorithm, it will add up to a lot of instructions, or clock cycles if
 you will, in the end. By using pointers instead, we could omit the use of indices of the arrays, and instead
-only increment the address by one byte. This minimized the overhead of the loops, since we only had to
-keep track of the address of the current element in the array.
+only increment the address of the pointer by one word. This minimized the overhead of the loops, since we only
+had to keep track of the address of the current element in the array.
 
 After running the program with the provided {\it Performance Evaluation Tool} (PET), we could analyze if
 we had any {\it branch hazards} or {\it load-use hazards}. Branch hazards occur when an instruction
-calculates a value for a conditional branch, that is directly subsequent. The CPU will then have to stall
+calculates a value for a conditional branch that is directly subsequent. The CPU will then have to stall
 one clock cycle due to the delay in the pipeline, which is a waste of performance. By reordering the
 instructions, for example inserting a completely independent instruction in between, we could avoid
 this type of hazard. Load-use hazards work in a similar way; when loading a value to a register,
@@ -85,15 +86,15 @@ commonly calculated addresses and values stored in registers (such as the loop l
 peel of some instructions from the code. Our goal was to reduce the program to only consist of the 
 absolutely necessary instructions, and make sure that values used often only got calculated once. We 
 found out later that it would be very important to make sure that  all instructions, that were contained in the 
-outermost loop, could fit inside the {\it Instruction Cache} memory unit (I-cache). If we only could reduce 
+outmost loop, could fit inside the {\it Instruction Cache} memory unit (I-cache). If we only could reduce 
 the instructions to fit in the cache, we would almost exclusively get a 100\% {\it hit rate}. High hit rates
 greatly improve performance by only wasting relatively few clock cycles for fetching instructions from the
 main memory.
 
 To achieve this goal of going under the limit, we had to often think of ways to execute one function of the
-program in a different way, whilst still getting an identical result. A good source of improvement was to 
-look at how the {\it branching} of the program was executed. In the beginning we had two branch-
-instructions in each loop; one for checking a condition for exiting the loop, and one to jump to the 
+program in a different way, while still getting an identical result. A good source of improvement was to 
+look at how the branching of the program was executed. In the beginning we had two branch-instructions
+in each loop; one in the beginning for checking a condition for exiting the loop, and one for jumping to the 
 beginning of the loop. The reason we initially designed it like this was that sometimes we didn't wanted to 
 enter the loop at all, if the condition was met (for exiting the loop) at the start. If we hadn't checked in the 
 beginning of the loop, we would've had unwanted execution of the program. They way we improved this 
@@ -116,37 +117,43 @@ was to get the best performance as cheap as possible, we could not simply try to
 time possible. With this in mind, we tested several different configurations. In the following subsections we 
 describe our thought process when deciding which hardware configuration to use.
 
-\subsubsection{Data Cache}
-With the D-cache, we had to hit a balance between price and performance. Larger cache gives better 
-execution times, since there is such a large amount of memory accesses, but the price increase is steeper 
-than the performance increase. Therefore we had to find a point when the price would drain the possible 
-performance gain that we would get. The main cost for the caches are prices for larger ones, so we had to 
-find other ways to improve performance than just having a large cache. Associativity is a great hardware 
-implementation that makes the miss rate drop down greatly, but unfortunately at the cost of slower CPU 
-clock speed. Nevertheless, a 2-way associativity of the D-cache has been proven to be the  best 
-configuration. As for block sizes, we would want to keep as much recent data in the cache for as long as 
-possible, while consulting the main memory as little as possible. In other words, we want to find a good 
-balance between the {\it temporal locality and spatial locality} usage. 
-
 \subsubsection{Instruction Cache}
 The I-cache only has to be as big as the largest loop in the program, or the longest streak of different 
 instructions. Since our program managed to compress the largest loop down to under 32 instructions, a 
 32-word I-cache will suffice. A larger cache would be pointless, since price would go up and performance 
 in terms of CPU clock frequency would go down. Additionally, a direct-mapped associativity is the best 
-choice, since we have already such a high hit rate, and a higher associativity would also slow down the 
+choice, since we already have such a high hit rate, and a higher associativity would also slow down the 
 clock frequency.
 
-Finally, we wanted the block size of the I-cache to be as large as possible. Large blocks exploit the spatial 
-locality of the instructions in memory and end up with fewer cache misses. However, our code needed to 
+Finally, we wanted the block size of the I-cache to be as large as possible. Large blocks exploit the {\it spatial 
+locality} of the instructions in memory and end up with fewer cache misses. However, our code needed to 
 change in order to adopt to the large block size. Consider this; if we are in the first iteration of the 
-outermost loop of our program, and when we get near the end, we might store some instructions outside 
+outmost loop of our program, and when we get near the end, we might store some instructions outside 
 the loop in the cache, that are only necessary at the end of the program. This would mean that the {\it 
 Least Recently Used} (LRU) replacement policy of the cache would replace the early instructions of the 
 loop with the instructions outside. Then each time the program gets to the end, we would get a read miss, 
 and we'd start over again. This is not good, since it will generate unnecessary cache misses. The solution 
 would either be to change to another block size, or to pad the program with NOP-instructions, to 
-synchronize the cache writes better. That's what we did, and we ended up with fewer cache misses, for 
+synchronize the cache writes better. We did the latter, and we ended up with fewer cache misses, for 
 the same price of a same size cache with smaller blocks.
+
+\subsubsection{Data Cache}
+With the D-cache, we had to hit a balance between price and performance. Larger cache gives better 
+execution times, since there is such a large amount of memory accesses, but the price increase is steeper 
+than the performance increase. Therefore we had to find a point when the price would drain the possible 
+performance gain that we would get. The main cost for the caches are the prices for larger ones, so we had to 
+find other ways to improve performance than just having a large cache. Associativity is a great hardware 
+implementation that makes the miss rate drop down greatly, but unfortunately at the cost of slower CPU 
+clock speed. Nevertheless, a 2-way associativity of the D-cache has been proven to be the  best 
+configuration. As for block sizes, we would want to keep as much neighbouring data in the cache for as long as 
+it is usable, while consulting the main memory as little as possible. Large blocks have the advantage 
+of storing lots of forthcoming data from the memory when a cache miss occurs. It also has the disadvantage
+of requiring a larger write buffer when writing back the data to the memory, which could create a bottleneck.
+Finally the timing of the cache stores is also something to have in consideration. We only want the
+data that we need in a particular situation, and to not overshoot too often when storing in the cache. Therefore
+choosing a block size that is mostly divisible by the usable data is preferable, and to time the cache miss
+to occur exactly at the beginning of the data section of the memory. The latter is achieved by padding the
+memory with the appropriate amount of ``junk'' data (or other usable data not used for the matrix) in the memory.  
 
 \subsubsection{Memory}
 The main memory will have all the instructions and data stored for the program to access during its 
@@ -161,43 +168,42 @@ of time. However, we can't max it out with a giant buffer; we need to have a goo
 to the fact that first time accesses in one write session is longer than subsequent accesses. For this 
 reason we want to have the buffer busy almost all the time, i.e. increase the {\it utilization} as much as 
 possible, so that the shorter access time is being exploited. The sweet spot for our program landed at a 
-size of 4 words, presumably because of the data cache block size being 4 words, where most of the 
-writing occurs. Each time a write miss occurs in the D-cache, 4 subsequent data words in memory will be 
-written back.
+size of 12 words (which is the max limit for the buffer). Each time a write miss occurs in the D-cache, 12
+subsequent data words in memory will be written back.
 
 \subsection{Results}
 The final form of the system consist of one CPU, one main memory and two caches. The I-cache has a
 size of 32 words, with 8-word blocks and a direct-mapped associativity. The D-cache is configured with a 
-larger 64 word data space, with the smaller 4-word blocks and a 2-way associativity. Both caches 
+larger 64 word data space, also using 8-word blocks and a 2-way associativity. Both caches 
 implement the LRU replacement policy. The main memory has a first access time of 30 ns, with 
-subsequent accesses of 6 ns. The memory also has a write buffer of 4 words, to accommodate for the 
-frequent data writes. All specifications are listed in Table~\ref{specs}.
-
-\newpage
+subsequent accesses of 6 ns. The memory also has a write buffer of 12 words, to accommodate for the 
+frequent data writes. Table~\ref{specs} shows a compilation of the tested configurations
+for the system. 
 
 \begin{table}
 	\center
-	\large
+	\small
 	\def\arraystretch{1.2} 
-	\begin{tabular}{|l|l|}
+	\begin{tabular}{|l|l|r|}
 		\hline
-		\multicolumn{2}{|c|}{\bf Configuration} 						\\ \hline
-		I-cache size						& 32 words 			\\ 
-		I-cache associativity 				& Direct-mapped		\\ 
-		I-cache block size		 			& 8-word				\\ \hline
-		D-cache size 		 				& 64 words			\\ 
-		D-cache associativity 				& 2-way				\\ 
-		D-cache block size 		 			& 8-word				\\ \hline
-		Processor frequency		 			& 450 MHz			\\ \hline
-		Memory access time (first / others) 		& 30 ns / 6 ns			\\ 
-		Write buffer Size 		 			& 8-word				\\ \hline
-		\multicolumn{2}{|c|}{\bf Results} 							\\ \hline
-		Clock cycles 						& 120 928 			\\ 
-		Execution time		 				& 268.729 $ \mu s $ 		\\ 
-		Total component cost 				& 3.49 $ C\$ $			\\ 
-		Price $ \times $ performance			& 937.864 $ \mu sC\$ $	\\ \hline
+		\multicolumn{3}{|c|}{\bf Configuration (Performance / Price / Optimization)} 																	\\ \hline
+		I-cache size														& 64 / 32 / 32 words 		& \multirow{3}{*}{0.25 / 0 / 0 C\$} 					\\
+		I-cache associativity 									& Direct-mapped					&																							\\ 
+		I-cache block size		 									& 8-word								&																							\\ \hline
+		D-cache size 		 												& 64 / 32 / 64 words		& \multirow{3}{*}{0.25 / 0 / 0.25 C\$} 				\\ 
+		D-cache associativity 									& 2-way									&																							\\ 
+		D-cache block size 		 									& 8-word								&																							\\ \hline
+		Processor frequency		 									& 450 / 475 / 450 MHz		& 2 C\$																				\\ \hline
+		Memory access time (first-others) 			& 30-6 / 44-8 / 30-6 ns	&	\multirow{2}{*}{1.36 / 0.5 / 1.36 C\$}			\\ 
+		Write buffer Size 		 									& 12 / 0 / 12 words			&																							\\ \hline
+		\multicolumn{3}{|c|}{\bf Results} 																																						\\ \hline
+		Clock cycles 														& \multicolumn{2}{|l|}{116 812 / 247 128 / 116 884}										\\ 
+		Execution time		 											& \multicolumn{2}{|l|}{259.582 / 520.269 / 259.742 $ \mu s $}		 			\\ 
+		Total component cost 										& \multicolumn{2}{|l|}{3.86 / 2.5 / 3.61 $ C\$ $}											\\ 
+		Price $ \times $ performance						& \multicolumn{2}{|l|}{1 001.987 / 1 300.674 / 937.669 $ \mu sC\$ $}	\\ \hline
 	\end{tabular}
-	\caption{A compilation of the system's specifications.}
+	\caption{A compilation of three types of configurations for the system. When only one setting is
+		shown, then that setting is applied to all configurations.}
 	\label{specs}
 \end{table}
 

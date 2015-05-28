@@ -23,7 +23,7 @@ Home Assignment, DST15\_035\\
 {\large Dennis Bennhage \& Hampus Lidin}\\
 \vspace{10cm}
 %
-May 21st, 2015
+May 28th, 2015
 }
 
 \date{}
@@ -177,34 +177,16 @@ size of 32 words, with 8-word blocks and a direct-mapped associativity. The D-ca
 larger 64 word data space, also using 8-word blocks and a 2-way associativity. Both caches 
 implement the LRU replacement policy. The main memory has a first access time of 30 ns, with 
 subsequent accesses of 6 ns. The memory also has a write buffer of 12 words, to accommodate for the 
-frequent data writes. Table~\ref{specs} shows a compilation of the tested configurations
+frequent data writes. Figure~\ref{specs} shows a compilation of the tested configurations
 for the system. 
 
-\begin{table}
-	\center
-	\small
-	\def\arraystretch{1.2} 
-	\begin{tabular}{|l|l|r|}
-		\hline
-		\multicolumn{3}{|c|}{\bf Configuration (Performance / Price / Optimization)} 																	\\ \hline
-		I-cache size														& 64 / 32 / 32 words 		& \multirow{3}{*}{0.25 / 0 / 0 C\$} 					\\
-		I-cache associativity 									& Direct-mapped					&																							\\ 
-		I-cache block size		 									& 8-word								&																							\\ \hline
-		D-cache size 		 												& 64 / 32 / 64 words		& \multirow{3}{*}{0.25 / 0 / 0.25 C\$} 				\\ 
-		D-cache associativity 									& 2-way									&																							\\ 
-		D-cache block size 		 									& 8-word								&																							\\ \hline
-		Processor frequency		 									& 450 / 475 / 450 MHz		& 2 C\$																				\\ \hline
-		Memory access time (first-others) 			& 30-6 / 44-8 / 30-6 ns	&	\multirow{2}{*}{1.36 / 0.5 / 1.36 C\$}			\\ 
-		Write buffer Size 		 									& 12 / 0 / 12 words			&																							\\ \hline
-		\multicolumn{3}{|c|}{\bf Results} 																																						\\ \hline
-		Clock cycles 														& \multicolumn{2}{|l|}{116 812 / 247 128 / 116 884}										\\ 
-		Execution time		 											& \multicolumn{2}{|l|}{259.582 / 520.269 / 259.742 $ \mu s $}		 			\\ 
-		Total component cost 										& \multicolumn{2}{|l|}{3.86 / 2.5 / 3.61 $ C\$ $}											\\ 
-		Price $ \times $ performance						& \multicolumn{2}{|l|}{1 001.987 / 1 300.674 / 937.669 $ \mu sC\$ $}	\\ \hline
-	\end{tabular}
-	\caption{A compilation of three types of configurations for the system. When only one setting is
-		shown, then that setting is applied to all configurations.}
+\begin{figure}
+	\vspace*{-3.5cm}
+	\begin{center}
+		\makebox[\textwidth]{\includegraphics[width=1.4\textwidth]{results.pdf}}
+	\end{center}
 	\label{specs}
-\end{table}
+	\caption{A compilation of the test cases made during the optimization of the hardware.}
+\end{figure}
 
 \end{document}
